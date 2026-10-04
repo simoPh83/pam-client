@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getLeadDetail } from "@/lib/queries";
+import { getLeadDetail, getProjectBundle } from "@/lib/queries";
+import { formatDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { OutreachSection } from "@/components/outreach-section";
 import { LeadMetaSection } from "@/components/lead-meta-section";
+import { ProjectTabs } from "@/components/project-tabs";
+
+// Always re-query Supabase per request — the page reads live project/outreach
+// data that changes between deploys and syncs.
+export const dynamic = "force-dynamic";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   if (value === null || value === undefined || value === "") return null;
@@ -16,16 +22,20 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default async function LeadDetailPage({
-  params,
+  searchParams,
 }: {
-  params: Promise<{ uid: string[] }>;
+  searchParams: Promise<{ uid?: string }>;
 }) {
-  // uids contain slashes (e.g. "Haringey/HGY/2026/1830"), so this is a
-  // catch-all route: Next decodes %2F into real segments and we rejoin them.
-  const { uid: segments } = await params;
-  const uid = segments.join("/");
+  // uids contain slashes (e.g. "Haringey/HGY/2026/1830") which Turbopack dev
+  // mode doesn't reliably remap to catch-all routes; use a query param instead.
+  const { uid } = await searchParams;
+  if (!uid) notFound();
   const { app, history, outreach, meta, otherByAgent } = await getLeadDetail(uid);
   if (!app) notFound();
+
+  const { project, members } = app.project_id
+    ? await getProjectBundle(Number(app.project_id))
+    : { project: null, members: [] };
 
   const links = [
     { label: "Council page", url: app.council_url },
@@ -44,6 +54,11 @@ export default async function LeadDetailPage({
 
   return (
     <div className="space-y-6">
+      <ProjectTabs
+        members={members}
+        currentUid={uid}
+        projectName={project?.name ?? null}
+      />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">
@@ -85,21 +100,21 @@ export default async function LeadDetailPage({
               <Field label="Development" value={app.development_type} />
               <Field label="Decision" value={app.decision} />
               <Field label="Decided by" value={app.decided_by} />
-              <Field label="Decided" value={app.decided_date} />
-              <Field label="Decision issued" value={app.decision_issued_date} />
-              <Field label="Received" value={app.date_received} />
-              <Field label="Validated" value={app.date_validated} />
-              <Field label="Target decision" value={app.target_decision_date} />
-              <Field label="Consultation ends" value={app.consultation_end_date} />
-              <Field label="Permission expires" value={app.permission_expires} />
+              <Field label="Decided" value={formatDate(app.decided_date)} />
+              <Field label="Decision issued" value={formatDate(app.decision_issued_date)} />
+              <Field label="Received" value={formatDate(app.date_received)} />
+              <Field label="Validated" value={formatDate(app.date_validated)} />
+              <Field label="Target decision" value={formatDate(app.target_decision_date)} />
+              <Field label="Consultation ends" value={formatDate(app.consultation_end_date)} />
+              <Field label="Permission expires" value={formatDate(app.permission_expires)} />
               <Field label="Ward" value={app.ward} />
               <Field label="Dwellings" value={app.n_dwellings} />
               <Field label="Documents" value={app.n_documents} />
               <Field label="Comments" value={app.n_comments} />
               <Field label="Constraints" value={app.n_constraints} />
               <Field label="UPRN" value={app.uprn} />
-              <Field label="First seen" value={app.first_seen} />
-              <Field label="Last updated" value={app.last_updated} />
+              <Field label="First seen" value={formatDate(app.first_seen)} />
+              <Field label="Last updated" value={formatDate(app.last_updated)} />
               <Field label="Applicant" value={app.applicant_name} />
             </dl>
           </div>
@@ -111,7 +126,7 @@ export default async function LeadDetailPage({
                 {history.map((h) => (
                   <li key={h.id} className="flex flex-wrap gap-2">
                     <span className="font-mono text-xs text-muted-foreground">
-                      {h.observed_at?.slice(0, 10)}
+                      {formatDate(h.observed_at?.slice(0, 10))}
                     </span>
                     <span>
                       {h.old_state ?? "∅"} → <strong>{h.new_state}</strong>
@@ -149,13 +164,13 @@ export default async function LeadDetailPage({
                   {otherByAgent.map((l) => (
                     <li key={l.uid}>
                       <Link
-                        href={`/lead/${encodeURIComponent(l.uid)}`}
+                        href={`/lead?uid=${encodeURIComponent(l.uid)}`}
                         className="hover:underline"
                       >
                         {l.reference ?? l.uid}
                       </Link>{" "}
                       <span className="text-xs text-muted-foreground">
-                        {l.authority} · {l.decided_date}
+                        {l.authority} · {formatDate(l.decided_date)}
                       </span>
                     </li>
                   ))}

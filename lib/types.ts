@@ -23,6 +23,28 @@ export type Lead = {
   n_dwellings: number | null;
   first_seen: string;
   last_updated: string;
+  project_id: number | null;
+  n_applications: number | null;
+};
+
+export type Project = {
+  id: number;
+  authority: string;
+  name: string | null;
+  address_key: string;
+  root_uid: string | null;
+  latest_uid: string | null;
+  n_applications: number;
+  first_seen: string | null;
+  last_updated: string | null;
+};
+
+export type ProjectMembership = {
+  project_id: number;
+  uid: string;
+  parent_ref: string | null;
+  is_root: boolean;
+  role: "original" | "variation" | "discharge" | "nma" | null;
 };
 
 export type ApplicationFull = Lead & {

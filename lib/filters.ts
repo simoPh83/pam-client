@@ -14,6 +14,7 @@ export type LeadFilters = {
   hasAgent: boolean;
   notContacted: boolean;
   starred: boolean;
+  grouped: boolean;
   sort: "decided_date" | "authority" | "app_size" | "app_state";
   dir: "asc" | "desc";
   page: number; // 1-based
@@ -38,6 +39,7 @@ export function defaultFilters(): LeadFilters {
     hasAgent: false,
     notContacted: false,
     starred: false,
+    grouped: true,
     sort: "decided_date",
     dir: "desc",
     page: 1,
@@ -69,6 +71,7 @@ export function parseFilters(
     hasAgent: str("hasAgent") === "1",
     notContacted: str("notContacted") === "1",
     starred: str("starred") === "1",
+    grouped: str("grouped") !== "0",
     sort:
       sort === "authority" || sort === "app_size" || sort === "app_state"
         ? sort
@@ -94,6 +97,7 @@ export function filtersToParams(f: LeadFilters): URLSearchParams {
   if (f.hasAgent) p.set("hasAgent", "1");
   if (f.notContacted) p.set("notContacted", "1");
   if (f.starred) p.set("starred", "1");
+  if (!f.grouped) p.set("grouped", "0");
   if (f.sort !== d.sort) p.set("sort", f.sort);
   if (f.dir !== d.dir) p.set("dir", f.dir);
   if (f.page > 1) p.set("page", String(f.page));

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { format } from "date-fns";
 import { addOutreachEntry } from "@/lib/actions";
+import { formatDate, formatDateTime } from "@/lib/dates";
 import type { OutreachEntry } from "@/lib/types";
 import { OUTREACH_CHANNELS, OUTREACH_STATUSES } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -129,18 +129,18 @@ export function OutreachSection({
           {entries.map((en) => (
             <li key={en.id} className="border-t pt-3 text-sm">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className={STATUS_STYLE[en.status]}>
-                  {en.status.replace("_", " ")}
+                <Badge variant="outline" className={STATUS_STYLE[en.status ?? ""]}>
+                  {(en.status ?? "contacted").replace("_", " ")}
                 </Badge>
                 {en.channel && (
                   <span className="text-xs text-muted-foreground">{en.channel}</span>
                 )}
                 <span className="font-mono text-xs text-muted-foreground">
-                  {format(new Date(en.contacted_at), "yyyy-MM-dd HH:mm")}
+                  {formatDateTime(en.contacted_at)}
                 </span>
                 {en.follow_up_on && (
                   <span className="text-xs">
-                    follow-up {en.follow_up_on}
+                    follow-up {formatDate(en.follow_up_on)}
                   </span>
                 )}
                 <span className="ml-auto text-xs text-muted-foreground">

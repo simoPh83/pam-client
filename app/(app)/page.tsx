@@ -10,6 +10,8 @@ import { LeadsFilters } from "@/components/leads-filters";
 import { LeadsTable } from "@/components/leads-table";
 import { Pagination } from "@/components/pagination";
 
+export const dynamic = "force-dynamic";
+
 export default async function LeadsPage({
   searchParams,
 }: {
@@ -18,7 +20,7 @@ export default async function LeadsPage({
   const filters = parseFilters(await searchParams);
   const [boroughs, { rows, total, metaByUid }] = await Promise.all([
     getBoroughs(),
-    getLeads(filters),
+    getLeads(filters, { grouped: filters.grouped }),
   ]);
 
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -32,6 +34,7 @@ export default async function LeadsPage({
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <span>
           {total.toLocaleString()} leads
+          {filters.grouped ? " (grouped by project)" : ""}
           {filters.decidedFrom ? ` · decided since ${filters.decidedFrom}` : ""}
         </span>
         <Pagination

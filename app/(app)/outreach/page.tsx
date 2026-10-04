@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { format } from "date-fns";
 import { getOutreach } from "@/lib/queries";
+import { formatDate, formatDateTime } from "@/lib/dates";
 import { OUTREACH_STATUSES } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+export const dynamic = "force-dynamic";
 
 export default async function OutreachPage({
   searchParams,
@@ -66,7 +68,7 @@ export default async function OutreachPage({
                     <TableCell className="font-mono text-xs">
                       {e.follow_up_on ? (
                         <span className={overdue ? "font-semibold text-red-600" : ""}>
-                          {e.follow_up_on}
+                          {formatDate(e.follow_up_on)}
                           {overdue ? " !" : ""}
                         </span>
                       ) : (
@@ -74,11 +76,13 @@ export default async function OutreachPage({
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{e.status.replace("_", " ")}</Badge>
+                      <Badge variant="outline">
+                        {(e.status ?? "contacted").replace("_", " ")}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Link
-                        href={`/lead/${encodeURIComponent(e.uid)}`}
+                        href={`/lead?uid=${encodeURIComponent(e.uid)}`}
                         className="font-mono text-xs hover:underline"
                       >
                         {lead?.reference ?? e.uid}
@@ -93,7 +97,7 @@ export default async function OutreachPage({
                       {[e.to_name, e.to_email].filter(Boolean).join(" · ") || "—"}
                     </TableCell>
                     <TableCell className="font-mono text-xs">
-                      {format(new Date(e.contacted_at), "yyyy-MM-dd")}
+                      {formatDateTime(e.contacted_at)}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {e.created_by_email}

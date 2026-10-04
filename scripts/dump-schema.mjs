@@ -21,7 +21,8 @@ const { rows } = await client.query(`
   where table_schema = 'public'
     and table_name in ('applications', 'applications_full', 'state_history',
                        'jobs', 'leads', 'ui_outreach', 'ui_lead_meta',
-                       'ui_saved_filters', 'authority_urls')
+                       'ui_saved_filters', 'authority_urls',
+                       'projects', 'project_applications')
   order by table_name, ordinal_position
 `);
 

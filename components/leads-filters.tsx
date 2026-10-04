@@ -37,6 +37,7 @@ export function LeadsFilters({
   const [hasAgent, setHasAgent] = useState(filters.hasAgent);
   const [notContacted, setNotContacted] = useState(filters.notContacted);
   const [starred, setStarred] = useState(filters.starred);
+  const [grouped, setGrouped] = useState(filters.grouped);
 
   function apply(overrides: Partial<LeadFilters> = {}) {
     const next: LeadFilters = {
@@ -52,6 +53,7 @@ export function LeadsFilters({
       hasAgent,
       notContacted,
       starred,
+      grouped,
       page: 1,
       ...overrides,
     };
@@ -209,6 +211,16 @@ export function LeadsFilters({
             onCheckedChange={(v) => setStarred(v === true)}
           />
           Starred
+        </label>
+        <label className="flex items-center gap-1.5 text-xs">
+          <Checkbox
+            checked={grouped}
+            onCheckedChange={(v) => {
+              setGrouped(v === true);
+              apply({ grouped: v === true });
+            }}
+          />
+          Group by project
         </label>
       </div>
 

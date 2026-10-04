@@ -9,9 +9,11 @@ import {
   type ColumnDef,
 } from "@tanstack/react-table";
 import { ArrowDown, ArrowUp, Star } from "lucide-react";
-import type { Lead, LeadMeta } from "@/lib/types";
+import type { LeadMeta } from "@/lib/types";
+import type { LeadRow } from "@/lib/queries";
 import type { LeadFilters } from "@/lib/filters";
 import { filtersToParams } from "@/lib/filters";
+import { formatDate, formatMonthYear } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -60,13 +62,13 @@ export function LeadsTable({
   filters,
   metaByUid,
 }: {
-  rows: Lead[];
+  rows: LeadRow[];
   filters: LeadFilters;
   metaByUid: Record<string, LeadMeta>;
 }) {
   const router = useRouter();
 
-  const columns: ColumnDef<Lead>[] = [
+  const columns: ColumnDef<LeadRow>[] = [
     {
       id: "star",
       header: "",
@@ -79,9 +81,10 @@ export function LeadsTable({
     {
       accessorKey: "reference",
       header: "Reference",
+      size: 130,
       cell: ({ row }) => (
         <Link
-          href={`/lead/${encodeURIComponent(row.original.uid)}`}
+          href={`/lead?uid=${encodeURIComponent(row.original.uid)}`}
           className="font-mono text-xs hover:underline"
           onClick={(e) => e.stopPropagation()}
         >
@@ -92,19 +95,27 @@ export function LeadsTable({
     {
       accessorKey: "authority",
       header: () => <SortableHead label="Borough" col="authority" filters={filters} />,
+      size: 105,
     },
     {
       accessorKey: "address",
       header: "Address",
+      size: 190,
       cell: ({ getValue }) => (
-        <span className="line-clamp-1 max-w-64">{getValue<string>()}</span>
+        <span className="block truncate" title={getValue<string>() ?? ""}>
+          {getValue<string>()}
+        </span>
       ),
     },
     {
       accessorKey: "description",
       header: "Description",
+      // no size → takes the remaining flexible width
       cell: ({ getValue }) => (
-        <span className="line-clamp-2 max-w-md text-muted-foreground">
+        <span
+          className="block truncate text-muted-foreground"
+          title={getValue<string>() ?? ""}
+        >
           {getValue<string>()}
         </span>
       ),
@@ -112,6 +123,7 @@ export function LeadsTable({
     {
       accessorKey: "app_size",
       header: () => <SortableHead label="Size" col="app_size" filters={filters} />,
+      size: 84,
       cell: ({ getValue }) => {
         const v = getValue<string>();
         return v ? (
@@ -122,11 +134,13 @@ export function LeadsTable({
     {
       accessorKey: "app_state",
       header: () => <SortableHead label="State" col="app_state" filters={filters} />,
+      size: 104,
       cell: ({ getValue }) => (
         <Badge
           variant="outline"
           className={cn(
-            getValue<string>() === "Permitted" && "border-green-600 text-green-700 dark:text-green-400"
+            getValue<string>() === "Permitted" &&
+              "border-green-600 text-green-700 dark:text-green-400"
           )}
         >
           {getValue<string>()}
@@ -138,16 +152,47 @@ export function LeadsTable({
       header: () => (
         <SortableHead label="Decided" col="decided_date" filters={filters} />
       ),
-      cell: ({ getValue }) => (
-        <span className="font-mono text-xs">{getValue<string>()}</span>
+      size: 78,
+      cell: ({ row }) => (
+        <span className="font-mono text-xs">
+          {formatMonthYear(row.original.root_decided_date ?? row.original.decided_date)}
+        </span>
+      ),
+    },
+    {
+      id: "last_updated",
+      header: "Updated",
+      size: 92,
+      cell: ({ row }) => (
+        <span className="font-mono text-xs text-muted-foreground">
+          {formatDate(row.original.project_last_updated ?? row.original.last_updated)}
+        </span>
       ),
     },
     {
       accessorKey: "agent_display",
       header: "Agent",
+      size: 170,
       cell: ({ getValue }) => (
-        <span className="line-clamp-1 max-w-48">{getValue<string>()}</span>
+        <span className="block truncate" title={getValue<string>() ?? ""}>
+          {getValue<string>()}
+        </span>
       ),
+    },
+    {
+      id: "apps",
+      header: "Apps",
+      size: 52,
+      cell: ({ row }) =>
+        (row.original.n_applications ?? 1) > 1 ? (
+          <Badge
+            variant="secondary"
+            className="size-5 justify-center rounded-full p-0 text-[10px]"
+            title={`${row.original.n_applications} applications in this project`}
+          >
+            {row.original.n_applications}
+          </Badge>
+        ) : null,
     },
   ];
 
@@ -161,12 +206,20 @@ export function LeadsTable({
 
   return (
     <div className="rounded-md border">
-      <Table>
+      <Table className="table-fixed">
         <TableHeader>
           {table.getHeaderGroups().map((hg) => (
             <TableRow key={hg.id}>
               {hg.headers.map((h) => (
-                <TableHead key={h.id} className="whitespace-nowrap">
+                <TableHead
+                  key={h.id}
+                  className="whitespace-nowrap"
+                  style={
+                    h.column.getSize() !== 150
+                      ? { width: h.column.getSize() }
+                      : undefined
+                  }
+                >
                   {h.isPlaceholder
                     ? null
                     : flexRender(h.column.columnDef.header, h.getContext())}
@@ -182,11 +235,14 @@ export function LeadsTable({
                 key={row.id}
                 className="cursor-pointer"
                 onClick={() =>
-                  router.push(`/lead/${encodeURIComponent(row.original.uid)}`)
+                  router.push(`/lead?uid=${encodeURIComponent(row.original.uid)}`)
                 }
               >
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="py-1.5">
+                  <TableCell
+                    key={cell.id}
+                    className="overflow-hidden whitespace-normal py-1.5"
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}

@@ -33,7 +33,7 @@ export async function addOutreachEntry(
   });
   if (error) throw new Error(error.message);
 
-  revalidatePath("/lead/[...uid]", "page");
+  revalidatePath("/lead");
   revalidatePath("/outreach");
 }
 
@@ -59,6 +59,6 @@ export async function updateLeadMeta(
   );
   if (error) throw new Error(error.message);
 
-  revalidatePath("/lead/[...uid]", "page");
+  revalidatePath("/lead");
   revalidatePath("/");
 }

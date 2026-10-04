@@ -1,4 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
+import { formatDateTime } from "@/lib/dates";
 import { getJobsSummary } from "@/lib/queries";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -9,6 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+
+export const dynamic = "force-dynamic";
 
 export default async function StatusPage() {
   const { lastSyncByArea, queue, recentFailed } = await getJobsSummary();
@@ -49,7 +52,7 @@ export default async function StatusPage() {
                   <TableCell>{a.area}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {a.finished_at
-                      ? `${a.finished_at.slice(0, 16).replace("T", " ")} (${formatDistanceToNow(new Date(a.finished_at), { addSuffix: true })})`
+                      ? `${formatDateTime(a.finished_at)} (${formatDistanceToNow(new Date(a.finished_at), { addSuffix: true })})`
                       : "—"}
                   </TableCell>
                 </TableRow>
@@ -82,7 +85,7 @@ export default async function StatusPage() {
                       <Badge variant="outline">{j.kind}</Badge>
                     </TableCell>
                     <TableCell className="font-mono text-xs">
-                      {j.finished_at?.slice(0, 16).replace("T", " ")}
+                      {formatDateTime(j.finished_at)}
                     </TableCell>
                     <TableCell className="max-w-md">
                       <span className="line-clamp-2 text-xs text-muted-foreground">

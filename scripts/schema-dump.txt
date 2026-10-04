@@ -114,6 +114,8 @@ lng: double precision?
 n_dwellings: integer?
 first_seen: date?
 last_updated: date?
+project_id: bigint?
+n_applications: integer?
 
 ## state_history
 id: bigint
