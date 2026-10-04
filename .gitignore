@@ -36,3 +36,6 @@ Thumbs.db
 .vercel/
 *.log
 .pnpm-debug.log*
+
+# Research downloads (council PDFs — large, re-downloadable)
+research/downloads/
