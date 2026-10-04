@@ -18,9 +18,12 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 export default async function LeadDetailPage({
   params,
 }: {
-  params: Promise<{ uid: string }>;
+  params: Promise<{ uid: string[] }>;
 }) {
-  const { uid } = await params;
+  // uids contain slashes (e.g. "Haringey/HGY/2026/1830"), so this is a
+  // catch-all route: Next decodes %2F into real segments and we rejoin them.
+  const { uid: segments } = await params;
+  const uid = segments.join("/");
   const { app, history, outreach, meta, otherByAgent } = await getLeadDetail(uid);
   if (!app) notFound();
 
