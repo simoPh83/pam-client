@@ -10,6 +10,11 @@
 node_modules/
 .pnp
 .pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
 # Next.js
 .next/
@@ -30,3 +35,4 @@ test-results/
 Thumbs.db
 .vercel/
 *.log
+.pnpm-debug.log*
