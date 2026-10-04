@@ -220,10 +220,10 @@ export async function getLeadDetail(uid: string): Promise<{
 }> {
   const supabase = await createClient();
 
-  // Read project_id from the leads view (which the table page already uses
-  // successfully) rather than a separate project_applications lookup — that
-  // table's query was returning null under Next's fetch caching on this page.
-  const [appRes, fullRes, histRes, outRes, metaRes, leadRes] =
+  // project_id from project_applications (authoritative — covers ALL members,
+  // including non-lead discharges/NMAs). Leads view only contains leads, so it
+  // misses non-lead applications in a project.
+  const [appRes, fullRes, histRes, outRes, metaRes, leadRes, memberRes] =
     await Promise.all([
       supabase.from("applications").select("*").eq("uid", uid).maybeSingle(),
       supabase
@@ -243,6 +243,7 @@ export async function getLeadDetail(uid: string): Promise<{
       .order("contacted_at", { ascending: false }),
     supabase.from("ui_lead_meta").select("*").eq("uid", uid).maybeSingle(),
     supabase.from("leads").select("project_id, n_applications").eq("uid", uid).maybeSingle(),
+    supabase.from("project_applications").select("project_id").eq("uid", uid).maybeSingle(),
   ]);
 
   if (appRes.error) throw appRes.error;
@@ -253,9 +254,9 @@ export async function getLeadDetail(uid: string): Promise<{
   const app = {
     ...(appRes.data as Record<string, unknown>),
     ...(fullRes.data ?? {}),
-    // applications has no project_id; it lives on the leads view. Attach it
-    // (and the project size) so the detail page can render project tabs.
-    project_id: leadRes.data?.project_id ?? null,
+    // applications has no project_id. Prefer project_applications (covers all
+    // members incl. non-leads); fall back to the leads view for leads.
+    project_id: memberRes.data?.project_id ?? leadRes.data?.project_id ?? null,
     n_applications: leadRes.data?.n_applications ?? null,
   } as ApplicationFull;
 

@@ -13,11 +13,18 @@ type Member = ProjectMembership & {
 };
 
 const ROLE_LABEL: Record<string, string> = {
-  original: "Original",
   variation: "Variation",
   discharge: "Discharge",
   nma: "NMA",
 };
+
+// Label for a member tab: only the root is "Original"; other original-role
+// members are sibling full applications.
+function roleLabel(m: ProjectMembership): string {
+  if (m.is_root) return "Original";
+  if (m.role === "original") return "Application";
+  return ROLE_LABEL[m.role ?? ""] ?? m.role ?? "Application";
+}
 
 export function ProjectTabs({
   members,
@@ -49,7 +56,7 @@ export function ProjectTabs({
               key={m.uid}
               role="tab"
               aria-selected={isCurrent}
-              title={`${m.reference ?? m.uid} — ${ROLE_LABEL[m.role ?? ""] ?? m.role ?? "application"}${m.app_state ? ` — ${m.app_state}` : ""}`}
+              title={`${m.reference ?? m.uid} — ${roleLabel(m)}${m.app_state ? ` — ${m.app_state}` : ""}`}
               onClick={() => router.push(`/lead?uid=${encodeURIComponent(m.uid)}`)}
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-xs transition-colors",
@@ -64,7 +71,7 @@ export function ProjectTabs({
               {m.is_root && <span aria-hidden>★</span>}
               {m.reference ?? m.uid}
               <span className="font-sans text-[10px] opacity-70">
-                {ROLE_LABEL[m.role ?? ""] ?? m.role}
+                {roleLabel(m)}
                 {m.decided_date ? ` · ${formatMonthYear(m.decided_date)}` : ""}
               </span>
             </button>
