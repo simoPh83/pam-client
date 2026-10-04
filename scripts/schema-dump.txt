@@ -1,0 +1,155 @@
+
+## applications
+uid: text
+reference: text?
+authority: text?
+app_state: text?
+app_size: text?
+start_date: date?
+decided_date: date?
+first_seen: date
+last_updated: date
+in_leads_sheet: boolean
+address: text?
+postcode: text?
+description: text?
+app_type: text?
+agent_name: text?
+applicant_name: text?
+permission_expires: date?
+distance_km: double precision?
+lat: double precision?
+lng: double precision?
+council_url: text?
+docs_url: text?
+other_fields_json: jsonb?
+decision: text?
+decided_by: text?
+source_status: text?
+ward: text?
+parish: text?
+development_type: text?
+comment_url: text?
+map_url: text?
+planning_portal_id: text?
+uprn: text?
+appeal_reference: text?
+appeal_result: text?
+date_received: date?
+date_validated: date?
+target_decision_date: date?
+consultation_end_date: date?
+application_expires_date: date?
+decision_issued_date: date?
+appeal_date: date?
+appeal_decision_date: date?
+n_documents: integer?
+n_comments: integer?
+n_constraints: integer?
+n_dwellings: integer?
+last_changed: timestamp with time zone?
+last_different: timestamp with time zone?
+last_scraped: timestamp with time zone?
+agent_company: text?
+agent_address: text?
+agent_display: text?
+application_type: text?
+applicant_address: text?
+n_statutory_days: integer?
+comment_date: date?
+neighbour_consultation_start_date: date?
+neighbour_consultation_end_date: date?
+consultation_start_date: date?
+decision_published_date: date?
+
+## applications_full
+uid: text?
+council_url: text?
+docs_url: text?
+comment_url: text?
+map_url: text?
+source_url: text?
+
+## authority_urls
+authority: text
+field: text
+base_url: text
+
+## jobs
+id: bigint
+kind: text
+area: text
+start_date: date?
+end_date: date?
+since: date?
+priority: integer
+status: text
+attempts: integer
+not_before: timestamp with time zone
+created_at: timestamp with time zone
+started_at: timestamp with time zone?
+finished_at: timestamp with time zone?
+stats: jsonb?
+error: text?
+dedupe_key: text?
+
+## leads
+uid: text?
+reference: text?
+authority: text?
+address: text?
+postcode: text?
+description: text?
+app_type: text?
+app_size: text?
+app_state: text?
+decided_date: date?
+agent_display: text?
+agent_name: text?
+agent_company: text?
+agent_address: text?
+applicant_name: text?
+lat: double precision?
+lng: double precision?
+n_dwellings: integer?
+first_seen: date?
+last_updated: date?
+
+## state_history
+id: bigint
+uid: text
+observed_at: timestamp with time zone
+old_state: text?
+new_state: text?
+decided_date: date?
+decision: text?
+last_different: timestamp with time zone?
+
+## ui_lead_meta
+uid: text
+starred: boolean
+hidden: boolean
+notes: text?
+updated_by: uuid?
+updated_at: timestamp with time zone
+
+## ui_outreach
+id: uuid
+uid: text
+contacted_at: timestamp with time zone
+channel: text?
+to_name: text?
+to_email: text?
+status: text
+follow_up_on: date?
+notes: text?
+created_by: uuid
+created_by_email: text?
+created_at: timestamp with time zone
+
+## ui_saved_filters
+id: uuid
+name: text
+params: jsonb
+created_by: uuid
+created_at: timestamp with time zone

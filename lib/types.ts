@@ -1,5 +1,6 @@
-// Row shapes matching the Supabase schema (see web-client-kickoff/01-database-contract.md).
-// Most date columns are TEXT in ISO YYYY-MM-DD form.
+// Row shapes matching the live Supabase schema (see scripts/dump-schema.mjs output).
+// Date columns are Postgres `date` → returned by supabase-js as "YYYY-MM-DD" strings.
+// Timestamps are timestamptz → ISO strings.
 
 export type Lead = {
   uid: string;
@@ -20,30 +21,48 @@ export type Lead = {
   lat: number | null;
   lng: number | null;
   n_dwellings: number | null;
-  first_seen: string | null;
-  last_updated: string | null;
+  first_seen: string;
+  last_updated: string;
 };
 
 export type ApplicationFull = Lead & {
+  start_date: string | null;
+  in_leads_sheet: boolean;
   date_received: string | null;
   date_validated: string | null;
   target_decision_date: string | null;
+  consultation_start_date: string | null;
   consultation_end_date: string | null;
+  neighbour_consultation_start_date: string | null;
+  neighbour_consultation_end_date: string | null;
+  application_expires_date: string | null;
   decision_issued_date: string | null;
+  decision_published_date: string | null;
   permission_expires: string | null;
+  appeal_date: string | null;
+  appeal_decision_date: string | null;
+  comment_date: string | null;
   decision: string | null;
   decided_by: string | null;
+  source_status: string | null;
+  application_type: string | null;
   development_type: string | null;
   ward: string | null;
+  parish: string | null;
   uprn: string | null;
+  distance_km: number | null;
   n_documents: number | null;
   n_comments: number | null;
   n_constraints: number | null;
-  source_status: string | null;
+  n_statutory_days: number | null;
+  applicant_address: string | null;
   appeal_reference: string | null;
   appeal_result: string | null;
   planning_portal_id: string | null;
-  in_leads_sheet: number | null;
+  last_changed: string | null;
+  last_different: string | null;
+  last_scraped: string | null;
+  // Full URLs from the applications_full view (join on uid).
   council_url: string | null;
   docs_url: string | null;
   comment_url: string | null;
@@ -54,7 +73,7 @@ export type ApplicationFull = Lead & {
 export type StateHistoryRow = {
   id: number;
   uid: string;
-  observed_at: string | null;
+  observed_at: string;
   old_state: string | null;
   new_state: string | null;
   decided_date: string | null;
@@ -95,3 +114,14 @@ export type Job = {
   stats: Record<string, unknown> | null;
   error: string | null;
 };
+
+export const OUTREACH_STATUSES = [
+  "contacted",
+  "replied",
+  "follow_up",
+  "won",
+  "lost",
+  "no_interest",
+] as const;
+
+export const OUTREACH_CHANNELS = ["email", "phone", "linkedin", "other"] as const;
