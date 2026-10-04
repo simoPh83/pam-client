@@ -11,7 +11,7 @@ See `web-client-kickoff/` for the full brief and database contract.
 ## Stack
 
 - Next.js 16 (App Router) + TypeScript + Tailwind CSS 4 + shadcn/ui + TanStack Table
-- Supabase Auth (invite-only email magic links; no sign-up page)
+- Supabase Auth (invite-only; email + password sign-in, magic link and password-reset fallback)
 - Deployed on Vercel (env vars configured there)
 
 ## Setup
@@ -42,12 +42,16 @@ pnpm verify:db      # sanity-check leads view + ui tables + RLS
 
 ## Auth
 
-Users are invited from the Supabase dashboard (Authentication → Users →
-Invite); public sign-ups are disabled. All routes except `/login` and
-`/auth/callback` require a session (enforced by `proxy.ts`).
+Users are created from the Supabase dashboard (Authentication → Users → Add
+user → Create user, with "Auto Confirm User" ticked — set an initial password
+there); public sign-ups are disabled. Sign-in is email + password by default,
+with magic-link and password-reset options on the login page. All routes
+except `/login` and `/auth/callback` require a session (enforced by
+`proxy.ts`).
 
-For magic links to work after deploy, add both `http://localhost:3000` and the
-Vercel domain under Supabase → Authentication → URL Configuration.
+For email links (magic link / password reset) to work after deploy, add both
+`http://localhost:3000` and the Vercel domain under Supabase → Authentication
+→ URL Configuration (Site URL + Redirect URLs).
 
 ## Database rules
 

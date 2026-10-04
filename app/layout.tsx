@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PAM — Planning Leads",
+  title: "PAM — Planning Application Monitor",
   description: "London planning application leads for architecture photography",
 };
 
