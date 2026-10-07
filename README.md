@@ -4,7 +4,9 @@ Web UI for PAM (Planning Application Monitor) — surfaces London planning
 applications as leads for architecture photography outreach. Reads from the
 Supabase Postgres populated by the fetcher worker ([simoPh83/pam](https://github.com/simoPh83/pam),
 running on Railway). **This app never writes to the fetcher tables** — human
-data lives in `ui_*` tables (`ui_outreach`, `ui_lead_meta`, `ui_saved_filters`).
+data lives in `ui_*` tables (`ui_outreach`, `ui_project_stars`,
+`ui_project_meta`, `ui_saved_filters`). See `docs/session-log.md` for the
+2026-10-07 project-grouping rework.
 
 See `web-client-kickoff/` for the full brief and database contract.
 

@@ -18,6 +18,9 @@ create index if not exists idx_state_history_uid
 
 -- Leads view: approved schemes (Permitted or Conditions), excluding Trees.
 -- security_invoker = true so RLS on the base table applies to the caller.
+-- Columns must match the live view exactly (it was extended with project_id
+-- and n_applications after this migration first shipped) so that re-applying
+-- stays a no-op — CREATE OR REPLACE VIEW cannot drop columns.
 create or replace view public.leads
   with (security_invoker = true) as
 select a.uid,
@@ -39,8 +42,12 @@ select a.uid,
        a.lng,
        a.n_dwellings,
        a.first_seen,
-       a.last_updated
+       a.last_updated,
+       pa.project_id,
+       p.n_applications
 from public.applications a
+left join public.project_applications pa on pa.uid = a.uid
+left join public.projects p on p.id = pa.project_id
 where a.app_state in ('Permitted', 'Conditions')
   and coalesce(a.app_type, '') <> 'Trees';
 

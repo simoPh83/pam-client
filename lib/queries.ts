@@ -3,77 +3,84 @@ import type {
   ApplicationFull,
   Job,
   Lead,
-  LeadMeta,
   OutreachEntry,
+  ProjectFeedRow,
+  ProjectMeta,
   StateHistoryRow,
 } from "@/lib/types";
-import { PAGE_SIZE, type LeadFilters } from "@/lib/filters";
+import { PAGE_SIZE, type ProjectFilters } from "@/lib/project-filters";
 import type { Project, ProjectMembership } from "@/lib/types";
 
-export { PAGE_SIZE, parseFilters, filtersToParams, defaultFilters, daysAgo } from "@/lib/filters";
-export type { LeadFilters } from "@/lib/filters";
+export { PAGE_SIZE } from "@/lib/project-filters";
 
-/** Row displayed in the leads table: a lead + project roll-up fields. */
-export type LeadRow = Lead & {
-  project_last_updated: string | null;
-  root_decided_date: string | null;
+/** PostgREST filter fragments for the grouped root-status filter. */
+export type ProjectFeedResult = {
+  rows: (ProjectFeedRow & { missing_parent_status: string | null })[];
+  total: number;
 };
 
-/** Collapse a page of leads into one row per project (ungrouped rows pass through). */
-export async function groupLeads(rows: Lead[]): Promise<LeadRow[]> {
-  const byProject = new Map<number, Lead[]>();
-  const result: LeadRow[] = [];
+/** Project-grouped leads feed: one row per project from projects_feed. */
+export async function getProjectsFeed(
+  f: ProjectFilters
+): Promise<ProjectFeedResult> {
+  const supabase = await createClient();
 
-  for (const lead of rows) {
-    if (lead.project_id && (lead.n_applications ?? 1) > 1) {
-      const list = byProject.get(lead.project_id) ?? [];
-      list.push(lead);
-      byProject.set(lead.project_id, list);
-    } else {
-      result.push({ ...lead, project_last_updated: null, root_decided_date: null });
+  let query = supabase
+    .from("projects_feed")
+    .select("*", { count: "exact" })
+    .eq("hidden", false);
+
+  if (f.boroughs.length) query = query.in("authority", f.boroughs);
+  if (f.filedFrom) query = query.gte("filed_date", f.filedFrom);
+  if (f.filedTo) query = query.lte("filed_date", f.filedTo);
+  if (f.updatedFrom) query = query.gte("last_updated", f.updatedFrom);
+  if (f.updatedTo) query = query.lte("last_updated", f.updatedTo);
+  if (f.rootStatus.length) query = query.in("root_state_group", f.rootStatus);
+  if (f.q) {
+    // Name-only in v1: matching root_description would force joining
+    // applications for every candidate row (~15s). Revisit with a trigram
+    // index or a worker-denormalised column.
+    const like = `%${f.q.replace(/[%,()]/g, " ")}%`;
+    query = query.ilike("name", like);
+  }
+  if (f.starred) query = query.eq("starred_by_me", true);
+
+  query = query
+    .order(f.sort, { ascending: f.dir === "asc", nullsFirst: false })
+    .order("id", { ascending: true }) // stable tiebreaker
+    .range((f.page - 1) * PAGE_SIZE, f.page * PAGE_SIZE - 1);
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  const rows = (data ?? []) as ProjectFeedRow[];
+
+  // For projects whose root isn't in the DB, annotate with the parent-hunt
+  // status so the UI can explain ("being fetched" vs "not found").
+  const missingIds = rows
+    .filter((r) => r.root_in_db === false)
+    .map((r) => r.id);
+  const statusByProject = new Map<number, string>();
+  if (missingIds.length) {
+    const { data: mp } = await supabase
+      .from("missing_parents")
+      .select("project_id, status")
+      .in("project_id", missingIds);
+    for (const r of mp ?? []) {
+      // worst-status wins: exhausted > pending > found
+      const prev = statusByProject.get(r.project_id as number);
+      const cur = r.status as string;
+      if (!prev || cur === "exhausted" || (cur === "pending" && prev === "found"))
+        statusByProject.set(r.project_id as number, cur);
     }
   }
-  if (byProject.size === 0) return result;
 
-  const supabase = await createClient();
-  const ids = [...byProject.keys()];
-  const { data: projects } = await supabase
-    .from("projects")
-    .select("id, root_uid, latest_uid, last_updated")
-    .in("id", ids);
-  const projectById = new Map((projects ?? []).map((p) => [p.id, p]));
-
-  // Fetch root rows for projects whose root isn't on this page (and isn't the rep).
-  const rootUids = new Set<string>();
-  for (const [pid, members] of byProject) {
-    const rootUid = projectById.get(pid)?.root_uid;
-    if (rootUid && !members.some((m) => m.uid === rootUid)) rootUids.add(rootUid);
-  }
-  const rootDateByUid = new Map<string, string | null>();
-  if (rootUids.size) {
-    const { data: roots } = await supabase
-      .from("applications")
-      .select("uid, decided_date")
-      .in("uid", [...rootUids]);
-    for (const r of roots ?? []) rootDateByUid.set(r.uid, r.decided_date);
-  }
-
-  for (const [pid, members] of byProject) {
-    const project = projectById.get(pid);
-    // Representative: the project's latest member if present on this page,
-    // else the first member in the page's (already-sorted) order.
-    const rep =
-      members.find((m) => m.uid === project?.latest_uid) ?? members[0];
-    const rootOnPage = members.find((m) => m.uid === project?.root_uid);
-    result.push({
-      ...rep,
-      project_last_updated: project?.last_updated ?? null,
-      root_decided_date: project?.root_uid
-        ? (rootOnPage?.decided_date ?? rootDateByUid.get(project.root_uid) ?? null)
-        : null,
-    });
-  }
-  return result;
+  return {
+    rows: rows.map((r) => ({
+      ...r,
+      missing_parent_status: statusByProject.get(r.id) ?? null,
+    })),
+    total: count ?? 0,
+  };
 }
 
 export async function getProjectBundle(projectId: number | string): Promise<{
@@ -140,82 +147,11 @@ export async function getBoroughs(): Promise<string[]> {
   return [...new Set(data.map((r) => r.authority as string))].sort();
 }
 
-export async function getLeads(
-  f: LeadFilters,
-  { grouped = true }: { grouped?: boolean } = {}
-): Promise<{
-  rows: LeadRow[];
-  total: number;
-  contactedUids: Set<string>;
-  metaByUid: Map<string, LeadMeta>;
-}> {
-  const supabase = await createClient();
-
-  // uid sets for cross-table toggles (ui_* tables are small in v1).
-  const [{ data: outreachUids }, { data: metaRows }] = await Promise.all([
-    f.notContacted
-      ? supabase.from("ui_outreach").select("uid")
-      : Promise.resolve({ data: null }),
-    supabase.from("ui_lead_meta").select("*"),
-  ]);
-
-  const contacted = new Set((outreachUids ?? []).map((r) => r.uid as string));
-  const meta = new Map<string, LeadMeta>(
-    (metaRows ?? []).map((m) => [m.uid, m as LeadMeta])
-  );
-  const starredUids = [...meta.values()].filter((m) => m.starred).map((m) => m.uid);
-  const hiddenUids = [...meta.values()].filter((m) => m.hidden).map((m) => m.uid);
-
-  let query = supabase.from("leads").select("*", { count: "exact" });
-
-  if (f.boroughs.length) query = query.in("authority", f.boroughs);
-  if (f.states.length) query = query.in("app_state", f.states);
-  if (f.sizes.length) query = query.in("app_size", f.sizes);
-  if (f.decidedFrom) query = query.gte("decided_date", f.decidedFrom);
-  if (f.decidedTo) query = query.lte("decided_date", f.decidedTo);
-  if (f.appType) query = query.eq("app_type", f.appType);
-  if (f.agent) query = query.ilike("agent_display", `%${f.agent}%`);
-  if (f.q) {
-    const like = `%${f.q}%`;
-    query = query.or(
-      `description.ilike.${like},address.ilike.${like},postcode.ilike.${like}`
-    );
-  }
-  if (f.hasAgent) query = query.not("agent_display", "is", null).neq("agent_display", "");
-  if (f.notContacted && contacted.size)
-    query = query.not("uid", "in", `(${[...contacted].join(",")})`);
-  if (f.starred)
-    query = starredUids.length
-      ? query.in("uid", starredUids)
-      : query.eq("uid", "__none__"); // no stars → no rows
-  if (hiddenUids.length)
-    query = query.not("uid", "in", `(${hiddenUids.join(",")})`);
-
-  // In grouped mode, fetch a fuller set per page so collapsing by project
-  // still yields ~PAGE_SIZE rows.
-  const rangeSize = grouped ? PAGE_SIZE * 2 : PAGE_SIZE;
-
-  query = query
-    .order(f.sort, { ascending: f.dir === "asc", nullsFirst: false })
-    .order("uid", { ascending: true }) // stable tiebreaker
-    .range((f.page - 1) * rangeSize, f.page * rangeSize - 1);
-
-  const { data, error, count } = await query;
-  if (error) throw error;
-
-  return {
-    rows: grouped ? await groupLeads((data ?? []) as Lead[]) : ((data ?? []) as LeadRow[]),
-    total: count ?? 0,
-    contactedUids: contacted,
-    metaByUid: meta,
-  };
-}
-
 export async function getLeadDetail(uid: string): Promise<{
   app: ApplicationFull | null;
   history: StateHistoryRow[];
   outreach: OutreachEntry[];
-  meta: LeadMeta | null;
+  meta: ProjectMeta | null;
   otherByAgent: Lead[];
 }> {
   const supabase = await createClient();
@@ -223,7 +159,7 @@ export async function getLeadDetail(uid: string): Promise<{
   // project_id from project_applications (authoritative — covers ALL members,
   // including non-lead discharges/NMAs). Leads view only contains leads, so it
   // misses non-lead applications in a project.
-  const [appRes, fullRes, histRes, outRes, metaRes, leadRes, memberRes] =
+  const [appRes, fullRes, histRes, outRes, leadRes, memberRes] =
     await Promise.all([
       supabase.from("applications").select("*").eq("uid", uid).maybeSingle(),
       supabase
@@ -241,7 +177,6 @@ export async function getLeadDetail(uid: string): Promise<{
       .select("*")
       .eq("uid", uid)
       .order("contacted_at", { ascending: false }),
-    supabase.from("ui_lead_meta").select("*").eq("uid", uid).maybeSingle(),
     supabase.from("leads").select("project_id, n_applications").eq("uid", uid).maybeSingle(),
     supabase.from("project_applications").select("project_id").eq("uid", uid).maybeSingle(),
   ]);
@@ -260,6 +195,36 @@ export async function getLeadDetail(uid: string): Promise<{
     n_applications: leadRes.data?.n_applications ?? null,
   } as ApplicationFull;
 
+  // Per-user project metadata (star/hidden/notes) — only meaningful when the
+  // application belongs to a project. Stars are read-shared, so restrict to
+  // the current user's own row.
+  let meta: ProjectMeta | null = null;
+  if (app.project_id != null) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const [starRes, metaRes] = await Promise.all([
+      user
+        ? supabase
+            .from("ui_project_stars")
+            .select("project_id")
+            .eq("project_id", app.project_id)
+            .eq("user_id", user.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("ui_project_meta")
+        .select("hidden, notes")
+        .eq("project_id", app.project_id)
+        .maybeSingle(),
+    ]);
+    meta = {
+      starred: starRes.data != null,
+      hidden: metaRes.data?.hidden ?? false,
+      notes: metaRes.data?.notes ?? null,
+    };
+  }
+
   let otherByAgent: Lead[] = [];
   if (app.agent_display) {
     const { data } = await supabase
@@ -276,7 +241,7 @@ export async function getLeadDetail(uid: string): Promise<{
     app,
     history: (histRes.data ?? []) as StateHistoryRow[],
     outreach: (outRes.data ?? []) as OutreachEntry[],
-    meta: (metaRes.data as LeadMeta | null) ?? null,
+    meta,
     otherByAgent,
   };
 }

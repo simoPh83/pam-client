@@ -179,7 +179,9 @@ export default async function LeadDetailPage({
             )}
           </div>
 
-          <LeadMetaSection uid={uid} meta={meta} />
+          {app.project_id != null && (
+            <LeadMetaSection projectId={Number(app.project_id)} meta={meta} />
+          )}
         </aside>
       </div>
     </div>

@@ -37,9 +37,34 @@ export async function addOutreachEntry(
   revalidatePath("/outreach");
 }
 
-export async function updateLeadMeta(
-  uid: string,
-  input: { starred?: boolean; hidden?: boolean; notes?: string }
+export async function toggleProjectStar(projectId: number, starred: boolean) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not signed in");
+
+  if (starred) {
+    const { error } = await supabase
+      .from("ui_project_stars")
+      .upsert({ project_id: projectId }, { onConflict: "user_id,project_id" });
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase
+      .from("ui_project_stars")
+      .delete()
+      .eq("project_id", projectId)
+      .eq("user_id", user.id);
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath("/lead");
+  revalidatePath("/");
+}
+
+export async function updateProjectMeta(
+  projectId: number,
+  input: { hidden?: boolean; notes?: string }
 ) {
   const supabase = await createClient();
   const {
@@ -47,15 +72,13 @@ export async function updateLeadMeta(
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not signed in");
 
-  const { error } = await supabase.from("ui_lead_meta").upsert(
+  const { error } = await supabase.from("ui_project_meta").upsert(
     {
-      uid,
-      ...(input.starred !== undefined ? { starred: input.starred } : {}),
+      project_id: projectId,
       ...(input.hidden !== undefined ? { hidden: input.hidden } : {}),
       ...(input.notes !== undefined ? { notes: input.notes } : {}),
-      updated_by: user.id,
     },
-    { onConflict: "uid" }
+    { onConflict: "user_id,project_id" }
   );
   if (error) throw new Error(error.message);
 

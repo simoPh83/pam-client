@@ -2,19 +2,19 @@
 
 import { useState, useTransition } from "react";
 import { Star } from "lucide-react";
-import { updateLeadMeta } from "@/lib/actions";
-import type { LeadMeta } from "@/lib/types";
+import { toggleProjectStar, updateProjectMeta } from "@/lib/actions";
+import type { ProjectMeta } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 export function LeadMetaSection({
-  uid,
+  projectId,
   meta,
 }: {
-  uid: string;
-  meta: LeadMeta | null;
+  projectId: number;
+  meta: ProjectMeta | null;
 }) {
   const [starred, setStarred] = useState(meta?.starred ?? false);
   const [hidden, setHidden] = useState(meta?.hidden ?? false);
@@ -24,17 +24,17 @@ export function LeadMetaSection({
   function toggleStar() {
     const v = !starred;
     setStarred(v);
-    startTransition(() => updateLeadMeta(uid, { starred: v }));
+    startTransition(() => toggleProjectStar(projectId, v));
   }
 
   function toggleHidden() {
     const v = !hidden;
     setHidden(v);
-    startTransition(() => updateLeadMeta(uid, { hidden: v }));
+    startTransition(() => updateProjectMeta(projectId, { hidden: v }));
   }
 
   function saveNotes() {
-    startTransition(() => updateLeadMeta(uid, { notes }));
+    startTransition(() => updateProjectMeta(projectId, { notes }));
   }
 
   return (

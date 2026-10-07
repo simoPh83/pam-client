@@ -118,12 +118,34 @@ export type OutreachEntry = {
   created_at: string;
 };
 
-export type LeadMeta = {
-  uid: string;
+export type ProjectMeta = {
   starred: boolean;
   hidden: boolean;
   notes: string | null;
-  updated_at: string;
+};
+
+/** Row of the projects_feed view (migration 003) — one row per project. */
+export type ProjectFeedRow = {
+  id: number;
+  authority: string;
+  name: string | null;
+  n_applications: number;
+  root_in_db: boolean | null;
+  first_seen: string | null;
+  last_updated: string | null;
+  root_uid: string | null;
+  latest_uid: string | null;
+  root_reference: string | null;
+  root_description: string | null;
+  filed_date: string | null;
+  root_state: string | null;
+  latest_reference: string | null;
+  latest_state: string | null;
+  latest_role: string | null;
+  starred_by_me: boolean;
+  starred_by_others: boolean;
+  hidden: boolean;
+  root_state_group: "approved" | "not_approved" | "pending" | "other";
 };
 
 export type Job = {
