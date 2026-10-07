@@ -106,6 +106,13 @@ search ~1.4s. Further gains need worker-side denormalisation (see below).
    sets). If it ever feels sluggish, candidates: worker-denormalised
    `projects.root_state`, or approximate counts (`count=planned` — measured
    116ms but the estimate was 2× off, so display would be misleading).
+4. **`last_updated` pollution (worker-side, spec drafted).** Parent-hunt /
+   backfill inserts of *historical* applications stamp `last_updated` =
+   discovery date, inflating `projects.last_updated` (109k of 160k projects
+   "updated in the last 6 days" on 2026-10-07; real state changes are tens
+   per day). Fix spec for the `pam` repo:
+   `docs/2026-10-07-last-activity-semantics.md` (insert path should stamp the
+   PlanIt event date + one-off cleanup SQL + acceptance criteria).
 
 Query timings after indexing (160k projects, session pooler): default sort
 ~190ms, name sort ~365ms, name search ~1s, borough+status ~0.1–3s, filed
