@@ -24,6 +24,11 @@ alter table public.ui_project_stars enable row level security;
 revoke all on public.ui_project_stars from anon;
 grant select, insert, delete on public.ui_project_stars to authenticated;
 
+-- The feed's starred_by_others lookup probes by project_id per row; the PK
+-- leads with user_id, so without this index each probe is a seq scan.
+create index if not exists idx_ui_project_stars_project
+  on public.ui_project_stars (project_id);
+
 drop policy if exists "read all stars" on public.ui_project_stars;
 create policy "read all stars" on public.ui_project_stars
   for select to authenticated using (true);
@@ -125,3 +130,9 @@ create index if not exists idx_projects_authority_last_updated
 -- Lets name-sorted pages scan in index order and join only the page's rows.
 create index if not exists idx_projects_name
   on public.projects (name asc nulls last);
+
+-- Covering index so root/latest joins can be served index-only. Without it,
+-- exact counts over the feed that filter on root state (or filed date) fetch
+-- the full applications row for every candidate (~15–20s → sub-second).
+create index if not exists idx_applications_feed_cover
+  on public.applications (uid) include (app_state, start_date, reference);

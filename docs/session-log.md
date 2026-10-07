@@ -69,6 +69,27 @@ Decisions made together:
   "cannot drop columns from view". Repo copy updated to match live; `pnpm
   migrate` is idempotent again.
 
+### Performance debugging (57014 statement timeout)
+
+The first UI test with an "Updated from" + "Approved" filter hit a statement
+timeout. Root cause: PostgREST `count=exact` (needed for pagination) evaluates
+the root-application join + star/hidden flags for **every matching row**, not
+just the 50-row page. Fixes, all in migration 003:
+
+- Covering index `applications(uid) include (app_state, start_date,
+  reference)` → index-only root/latest lookups (the big win: 15–20s →
+  sub-second for filtered counts).
+- Index `ui_project_stars(project_id)` — the `starred_by_others` probe
+  otherwise seq-scans per row (PK leads with `user_id`).
+- Tested and **rejected** a pre-aggregated-joins view variant (`projects_feed
+  _v2`): counts improved but page queries regressed ~100× (19s) because the
+  planner materialised the joins before LIMIT. Kept per-row subqueries.
+
+Timings as the authenticated user (via real JWT; `USERNAME_KEY`/
+`USERNAME_PASS` in `.env.local` — gitignored — used for this testing only):
+default page ~1.8s, updated+approved ~2.2s warm, borough+status ~2.4s, name
+search ~1.4s. Further gains need worker-side denormalisation (see below).
+
 ## Scope notes / follow-ups
 
 1. **Filed-date column is not sortable.** `filed_date` comes from the joined
@@ -81,10 +102,16 @@ Decisions made together:
 2. **Search covers project name/address only.** Matching
    `root_description` too would force the same per-row join (~15s).
    Revisit with a `pg_trgm` trigram index or worker-denormalised column.
+3. **Exact counts are the remaining hot path** (~2s warm for large result
+   sets). If it ever feels sluggish, candidates: worker-denormalised
+   `projects.root_state`, or approximate counts (`count=planned` — measured
+   116ms but the estimate was 2× off, so display would be misleading).
 
 Query timings after indexing (160k projects, session pooler): default sort
 ~190ms, name sort ~365ms, name search ~1s, borough+status ~0.1–3s, filed
-range ~2.5s, starred-only ~5s worst case (no stars yet).
+range ~2.5s, starred-only ~5s worst case (no stars yet). **Update:** those
+were data-only timings as superuser; the exact **count** was the real hot
+path in production — see "Performance debugging" above for final numbers.
 
 ## Not yet done (future sessions)
 
