@@ -15,7 +15,8 @@ export type ProjectFilters = {
   updatedTo: string | null;
   rootStatus: RootStatusGroup[];
   practice: PracticeStatus | null; // projects_feed.practice_status
-  q: string | null;
+  q: string | null; // project name search
+  desc: string | null; // root description search (trigram, min 3 chars)
   starred: boolean;
   sort: "last_updated" | "filed_date" | "name";
   dir: "asc" | "desc";
@@ -38,6 +39,7 @@ export function defaultProjectFilters(): ProjectFilters {
     rootStatus: [],
     practice: null,
     q: null,
+    desc: null,
     starred: false,
     sort: "last_updated",
     dir: "desc",
@@ -81,6 +83,7 @@ export function parseProjectFilters(
       ? (str("practice") as PracticeStatus)
       : null,
     q: str("q"),
+    desc: str("desc"),
     starred: str("starred") === "1",
     sort:
       sort === "filed_date" || sort === "name" ? sort : "last_updated",
@@ -102,6 +105,7 @@ export function projectFiltersToParams(f: ProjectFilters): URLSearchParams {
   if (f.rootStatus.length) p.set("rootStatus", f.rootStatus.join(","));
   if (f.practice) p.set("practice", f.practice);
   if (f.q) p.set("q", f.q);
+  if (f.desc) p.set("desc", f.desc);
   if (f.starred) p.set("starred", "1");
   if (f.sort !== d.sort) p.set("sort", f.sort);
   if (f.dir !== d.dir) p.set("dir", f.dir);

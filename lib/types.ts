@@ -147,6 +147,8 @@ export type ProjectFeedRow = {
   hidden: boolean;
   root_state_group: "approved" | "not_approved" | "pending" | "other";
   practice_status: PracticeStatus;
+  /** tsvector of the root description (migration 007); supabase-js returns it as a string. */
+  root_description_tsv: string | null;
 };
 
 /** Three-state practice signal on the projects feed (migration 004). */

@@ -17,6 +17,20 @@ import type { Project, ProjectMembership } from "@/lib/types";
 
 export { PAGE_SIZE } from "@/lib/project-filters";
 
+/**
+ * Normalise user boolean syntax into websearch_to_tsquery input:
+ * strips parentheses, turns `&`/`AND` into implicit AND (space) and
+ * `NOT x` into `-x`. OR, "quoted phrases" and -negation pass through.
+ */
+function toWebsearchQuery(input: string): string {
+  return input
+    .replace(/[()&]/g, " ")
+    .replace(/\bNOT\s+(\S+)/gi, "-$1")
+    .replace(/\bAND\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** PostgREST filter fragments for the grouped root-status filter. */
 export type ProjectFeedResult = {
   rows: (ProjectFeedRow & { missing_parent_status: string | null })[];
@@ -42,11 +56,21 @@ export async function getProjectsFeed(
   if (f.rootStatus.length) query = query.in("root_state_group", f.rootStatus);
   if (f.practice) query = query.eq("practice_status", f.practice);
   if (f.q) {
-    // Name-only in v1: matching root_description would force joining
-    // applications for every candidate row (~15s). Revisit with a trigram
-    // index or a worker-denormalised column.
     const like = `%${f.q.replace(/[%,()]/g, " ")}%`;
     query = query.ilike("name", like);
+  }
+  if (f.desc?.trim()) {
+    // Full-text search over the precomputed root-description tsvector
+    // (migration 007 — trigram ILIKE was unusable for common terms).
+    // websearch syntax: words AND by default, OR, "quoted phrases",
+    // -negation; a few extra boolean conventions are normalised below.
+    const tsq = toWebsearchQuery(f.desc);
+    if (tsq) {
+      query = query.textSearch("root_description_tsv", tsq, {
+        config: "english",
+        type: "websearch",
+      });
+    }
   }
   if (f.starred) query = query.eq("starred_by_me", true);
 

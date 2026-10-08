@@ -221,3 +221,63 @@ Timings after fix (count, 90-day window, ~20.9k rows): default 1667ms,
 assigned 185ms, agent 74ms, none 77ms; filtered page ~94ms. Cache verified
 against ground truth (33,360 = 33,360). The default count (~1.7s warm)
 remains the known exact-count hot path from 2026-10-07.
+
+## Description search + filter bar redesign (same evening)
+
+### Migration `supabase/migrations/006_description_search.sql` (applied)
+
+- `pg_trgm` extension (extensions schema) + GIN trigram index on
+  `applications.description` — enables ILIKE substring search over root
+  descriptions (previously a ~15s seq scan per query, so v1 was name-only).
+- `projects(root_uid)` index — lets the planner drive description-filtered
+  feed queries from the trgm bitmap scan and nested-loop into projects.
+
+Timings (count over feed, 90-day window): `desc~basement` (811 hits) 231ms
+warm, combined desc+practice+status ~100ms warm, page query ~400-570ms.
+First cold hit on a common term can take a few seconds (heap recheck) —
+under the 8s API timeout. Patterns under 3 chars can't use the trigram
+index; the query layer silently ignores them (`lib/queries.ts`) and the UI
+placeholder says "min 3 chars".
+
+### Code
+
+- `lib/project-filters.ts` — new `desc` filter (URL param `desc`).
+- `lib/queries.ts` — applies `ilike` on `root_description` when ≥3 chars.
+- `components/projects-filters.tsx` — filter bar restructured from one
+  wrapping row into: row 1 = full-width Project name + Description search
+  inputs (2-col grid), row 2 = Borough / Root status / Practice / date
+  ranges / starred with Apply+Reset right-aligned via `ml-auto`.
+
+## Description search v2: FTS + tsvector cache + longer timeout
+
+"erection" (41k matching applications) timed out even with the trigram
+index: Postgres never flipped to an FTS-first plan through the view — it
+scanned 21k projects and tsvectorized each root description row-by-row
+(~18s). Common planning terms ("erection", "demolition") match a quarter of
+the table, so per-match heap rechecks made trigram ILIKE unusable too.
+
+### Migration `supabase/migrations/007_description_fts.sql` (applied)
+
+- **`alter role authenticated set statement_timeout = '60s'`** (was 8s) —
+  product decision: slow beats failed.
+- `ui_project_root_tsv (project_id pk, tsv tsvector)` — precomputed English
+  tsvector of each project's ROOT application description, trigger-maintained
+  on `applications` (description changes) and `projects` (root_uid changes);
+  same fetcher-recreation caveat as 005 (re-run `pnpm migrate`).
+- `projects_feed` gains trailing `root_description_tsv` column (scalar PK
+  probe); the app filters it with PostgREST `textSearch` (tsvector columns
+  are used directly, `col @@ to_tsquery`).
+- Dropped the same-day trigram + ad-hoc FTS indexes on `applications`
+  (write overhead for the fetcher, superseded).
+
+Timings: desc=erection count 18s → 3.2s cold / **106ms warm**; boolean
+`house OR villa -garden` 108ms (1,634 hits); page queries ~130ms. Cache
+verified against ground truth (84,668 = 84,668); trigger verified in a
+rolled-back transaction.
+
+### Boolean search syntax (websearch_to_tsquery)
+
+`lib/queries.ts` normalises user input (`toWebsearchQuery`): parens and
+`&`/`AND` → implicit AND, `NOT x` → `-x`; `OR`, "quoted phrases" and
+`-negation` are native websearch syntax. English stemming applies
+(erection ↔ erections). Placeholder: `e.g. house OR villa -garden`.

@@ -31,9 +31,9 @@ const ROOT_STATUS_OPTIONS: { value: RootStatusGroup; label: string }[] = [
 ];
 
 const PRACTICE_OPTIONS: { value: PracticeStatus; label: string }[] = [
-  { value: "none", label: "No practice signal" },
-  { value: "agent", label: "PlanIt agent present" },
-  { value: "assigned", label: "Practice assigned" },
+  { value: "none", label: "none" },
+  { value: "agent", label: "by application" },
+  { value: "assigned", label: "by user" },
 ];
 
 export function ProjectsFilters({
@@ -45,6 +45,7 @@ export function ProjectsFilters({
 }) {
   const router = useRouter();
   const [q, setQ] = useState(filters.q ?? "");
+  const [desc, setDesc] = useState(filters.desc ?? "");
   const [filedFrom, setFiledFrom] = useState(filters.filedFrom ?? "");
   const [filedTo, setFiledTo] = useState(filters.filedTo ?? "");
   const [updatedFrom, setUpdatedFrom] = useState(filters.updatedFrom ?? "");
@@ -60,6 +61,7 @@ export function ProjectsFilters({
     const next: ProjectFilters = {
       ...filters,
       q: q || null,
+      desc: desc || null,
       filedFrom: filedFrom || null,
       filedTo: filedTo || null,
       updatedFrom: updatedFrom || null,
@@ -80,22 +82,36 @@ export function ProjectsFilters({
 
   return (
     <form
-      className="flex flex-wrap items-end gap-3 rounded-md border p-3"
+      className="space-y-3 rounded-md border p-3"
       onSubmit={(e) => {
         e.preventDefault();
         apply();
       }}
     >
-      <div className="space-y-1">
-        <Label className="text-xs">Search</Label>
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="project name / address"
-          className="h-8 w-56"
-        />
+      {/* Row 1: free-text searches */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label className="text-xs">Project name</Label>
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="name / address"
+            className="h-8"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Description</Label>
+          <Input
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            placeholder='e.g. house OR villa -garden'
+            className="h-8"
+          />
+        </div>
       </div>
 
+      {/* Row 2: structured filters + actions */}
+      <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
       <div className="space-y-1">
         <Label className="text-xs">Borough</Label>
         <DropdownMenu>
@@ -147,12 +163,12 @@ export function ProjectsFilters({
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs">Practice</Label>
+        <Label className="text-xs">Assigned Practice</Label>
         <Select
           value={practiceSel}
           onValueChange={(v) => setPracticeSel(v as PracticeStatus | "any")}
         >
-          <SelectTrigger className="h-8 w-44">
+          <SelectTrigger size="sm" className="w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -214,18 +230,21 @@ export function ProjectsFilters({
         </label>
       </div>
 
-      <Button type="submit" size="sm" className="h-8">
-        Apply
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-8"
-        onClick={() => router.push("/")}
-      >
-        Reset
-      </Button>
+      <div className="ml-auto flex gap-2">
+        <Button type="submit" size="sm" className="h-8">
+          Apply
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8"
+          onClick={() => router.push("/")}
+        >
+          Reset
+        </Button>
+      </div>
+      </div>
     </form>
   );
 }
