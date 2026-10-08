@@ -146,6 +146,56 @@ export type ProjectFeedRow = {
   starred_by_others: boolean;
   hidden: boolean;
   root_state_group: "approved" | "not_approved" | "pending" | "other";
+  practice_status: PracticeStatus;
+};
+
+/** Three-state practice signal on the projects feed (migration 004). */
+export type PracticeStatus = "none" | "agent" | "assigned";
+
+export type Practice = {
+  id: string;
+  name: string;
+  website: string | null;
+  notes: string | null;
+  created_by: string;
+  created_by_email: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PracticeContact = {
+  id: string;
+  practice_id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: string | null;
+  notes: string | null;
+  created_by: string;
+  created_by_email: string | null;
+  created_at: string;
+};
+
+/** A project-to-practice assignment joined with the shared practice record. */
+export type ProjectPractice = {
+  id: string;
+  project_id: number;
+  practice_id: string;
+  role: string | null;
+  notes: string | null;
+  created_by: string;
+  created_by_email: string | null;
+  created_at: string;
+  practice: Practice;
+  contacts: PracticeContact[];
+};
+
+/** PlanIt agent values aggregated across a project's applications (read-only). */
+export type ProjectAgent = {
+  agent_company: string | null;
+  agent_name: string | null;
+  agent_address: string | null;
+  references: string[];
 };
 
 export type Job = {

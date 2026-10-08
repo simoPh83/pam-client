@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ProjectFilters, RootStatusGroup } from "@/lib/project-filters";
 import { projectFiltersToParams } from "@/lib/project-filters";
+import type { PracticeStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,12 +15,25 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const ROOT_STATUS_OPTIONS: { value: RootStatusGroup; label: string }[] = [
   { value: "approved", label: "Approved" },
   { value: "not_approved", label: "Not approved" },
   { value: "pending", label: "Pending" },
   { value: "other", label: "Other / unknown" },
+];
+
+const PRACTICE_OPTIONS: { value: PracticeStatus; label: string }[] = [
+  { value: "none", label: "No practice signal" },
+  { value: "agent", label: "PlanIt agent present" },
+  { value: "assigned", label: "Practice assigned" },
 ];
 
 export function ProjectsFilters({
@@ -37,6 +51,9 @@ export function ProjectsFilters({
   const [updatedTo, setUpdatedTo] = useState(filters.updatedTo ?? "");
   const [boroughSel, setBoroughSel] = useState<string[]>(filters.boroughs);
   const [statusSel, setStatusSel] = useState<RootStatusGroup[]>(filters.rootStatus);
+  const [practiceSel, setPracticeSel] = useState<PracticeStatus | "any">(
+    filters.practice ?? "any"
+  );
   const [starred, setStarred] = useState(filters.starred);
 
   function apply(overrides: Partial<ProjectFilters> = {}) {
@@ -49,6 +66,7 @@ export function ProjectsFilters({
       updatedTo: updatedTo || null,
       boroughs: boroughSel,
       rootStatus: statusSel,
+      practice: practiceSel === "any" ? null : practiceSel,
       starred,
       page: 1,
       ...overrides,
@@ -126,6 +144,26 @@ export function ProjectsFilters({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs">Practice</Label>
+        <Select
+          value={practiceSel}
+          onValueChange={(v) => setPracticeSel(v as PracticeStatus | "any")}
+        >
+          <SelectTrigger className="h-8 w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">Any</SelectItem>
+            {PRACTICE_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-1">

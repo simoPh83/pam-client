@@ -1,6 +1,8 @@
 // Pure filter helpers for the project-grouped leads page — no server imports,
 // safe for client components.
 
+import type { PracticeStatus } from "@/lib/types";
+
 export const PAGE_SIZE = 50;
 
 export type RootStatusGroup = "approved" | "not_approved" | "pending" | "other";
@@ -12,6 +14,7 @@ export type ProjectFilters = {
   updatedFrom: string | null; // ISO date — projects.last_updated
   updatedTo: string | null;
   rootStatus: RootStatusGroup[];
+  practice: PracticeStatus | null; // projects_feed.practice_status
   q: string | null;
   starred: boolean;
   sort: "last_updated" | "filed_date" | "name";
@@ -33,6 +36,7 @@ export function defaultProjectFilters(): ProjectFilters {
     updatedFrom: daysAgo(90),
     updatedTo: null,
     rootStatus: [],
+    practice: null,
     q: null,
     starred: false,
     sort: "last_updated",
@@ -47,6 +51,8 @@ const ROOT_STATUS_GROUPS: RootStatusGroup[] = [
   "pending",
   "other",
 ];
+
+const PRACTICE_STATUSES: PracticeStatus[] = ["none", "agent", "assigned"];
 
 /** Parse URL search params into ProjectFilters (missing params = defaults). */
 export function parseProjectFilters(
@@ -71,6 +77,9 @@ export function parseProjectFilters(
     rootStatus: (str("rootStatus")?.split(",") ?? []).filter((s): s is RootStatusGroup =>
       ROOT_STATUS_GROUPS.includes(s as RootStatusGroup)
     ),
+    practice: PRACTICE_STATUSES.includes(str("practice") as PracticeStatus)
+      ? (str("practice") as PracticeStatus)
+      : null,
     q: str("q"),
     starred: str("starred") === "1",
     sort:
@@ -91,6 +100,7 @@ export function projectFiltersToParams(f: ProjectFilters): URLSearchParams {
     p.set("updatedFrom", f.updatedFrom ?? "any");
   if (f.updatedTo) p.set("updatedTo", f.updatedTo);
   if (f.rootStatus.length) p.set("rootStatus", f.rootStatus.join(","));
+  if (f.practice) p.set("practice", f.practice);
   if (f.q) p.set("q", f.q);
   if (f.starred) p.set("starred", "1");
   if (f.sort !== d.sort) p.set("sort", f.sort);

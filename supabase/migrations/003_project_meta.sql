@@ -69,7 +69,14 @@ create policy "own rows only" on public.ui_project_meta
 -- Single-query feed for the project-grouped leads table. security_invoker so
 -- underlying RLS applies; ui_project_stars / ui_project_meta are resolved for
 -- the calling user via auth.uid().
-create or replace view public.projects_feed
+--
+-- DROP + CREATE (not CREATE OR REPLACE): later migrations append columns to
+-- this view, and replaying this file must not fail with "cannot drop columns
+-- from view". The runner applies every migration in order, so the final
+-- definition always comes from the latest migration that touches the view.
+-- Grants are re-applied below.
+drop view if exists public.projects_feed;
+create view public.projects_feed
 with (security_invoker = true) as
 select
   p.id,

@@ -1,10 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getLeadDetail, getProjectBundle } from "@/lib/queries";
+import {
+  getLeadDetail,
+  getProjectAgents,
+  getProjectBundle,
+  getProjectPractices,
+} from "@/lib/queries";
 import { formatDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { OutreachSection } from "@/components/outreach-section";
 import { LeadMetaSection } from "@/components/lead-meta-section";
+import { PracticesSection } from "@/components/practices-section";
+import { ProjectAgents } from "@/components/project-agents";
 import { ProjectTabs } from "@/components/project-tabs";
 
 // Always re-query Supabase per request — the page reads live project/outreach
@@ -37,6 +44,17 @@ export default async function LeadDetailPage({
     ? await getProjectBundle(Number(app.project_id))
     : { project: null, members: [] };
 
+  // Project-level data (persistent across application tabs): shared practice
+  // assignments and the read-only aggregation of PlanIt agents.
+  const projectId = app.project_id != null ? Number(app.project_id) : null;
+  const [assignments, agents] =
+    projectId != null
+      ? await Promise.all([
+          getProjectPractices(projectId),
+          getProjectAgents(projectId),
+        ])
+      : [[], []];
+
   const links = [
     { label: "Council page", url: app.council_url },
     { label: "Documents", url: app.docs_url },
@@ -59,6 +77,12 @@ export default async function LeadDetailPage({
         currentUid={uid}
         projectName={project?.name ?? null}
       />
+      {projectId != null && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <PracticesSection projectId={projectId} assignments={assignments} />
+          <ProjectAgents agents={agents} />
+        </div>
+      )}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">

@@ -4,8 +4,12 @@ import type {
   Job,
   Lead,
   OutreachEntry,
+  Practice,
+  PracticeContact,
+  ProjectAgent,
   ProjectFeedRow,
   ProjectMeta,
+  ProjectPractice,
   StateHistoryRow,
 } from "@/lib/types";
 import { PAGE_SIZE, type ProjectFilters } from "@/lib/project-filters";
@@ -36,6 +40,7 @@ export async function getProjectsFeed(
   if (f.updatedFrom) query = query.gte("last_updated", f.updatedFrom);
   if (f.updatedTo) query = query.lte("last_updated", f.updatedTo);
   if (f.rootStatus.length) query = query.in("root_state_group", f.rootStatus);
+  if (f.practice) query = query.eq("practice_status", f.practice);
   if (f.q) {
     // Name-only in v1: matching root_description would force joining
     // applications for every candidate row (~15s). Revisit with a trigram
@@ -135,6 +140,136 @@ export async function getProjectBundle(projectId: number | string): Promise<{
   });
 
   return { project: project as Project, members: joined };
+}
+
+/** Shared practice assignments for a project, with practice + contacts. */
+export async function getProjectPractices(
+  projectId: number
+): Promise<ProjectPractice[]> {
+  const supabase = await createClient();
+
+  const { data: links, error } = await supabase
+    .from("ui_project_practices")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  if (!links?.length) return [];
+
+  const practiceIds = [...new Set(links.map((l) => l.practice_id as string))];
+  const [practicesRes, contactsRes] = await Promise.all([
+    supabase.from("ui_practices").select("*").in("id", practiceIds),
+    supabase
+      .from("ui_practice_contacts")
+      .select("*")
+      .in("practice_id", practiceIds)
+      .order("created_at", { ascending: true }),
+  ]);
+  if (practicesRes.error) throw practicesRes.error;
+  if (contactsRes.error) throw contactsRes.error;
+
+  const practiceById = new Map(
+    ((practicesRes.data ?? []) as Practice[]).map((p) => [p.id, p])
+  );
+  const contactsByPractice = new Map<string, PracticeContact[]>();
+  for (const c of (contactsRes.data ?? []) as PracticeContact[]) {
+    const list = contactsByPractice.get(c.practice_id) ?? [];
+    list.push(c);
+    contactsByPractice.set(c.practice_id, list);
+  }
+
+  return links
+    .map((l) => {
+      const practice = practiceById.get(l.practice_id as string);
+      if (!practice) return null;
+      return {
+        ...(l as Omit<ProjectPractice, "practice" | "contacts">),
+        practice,
+        contacts: contactsByPractice.get(practice.id) ?? [],
+      };
+    })
+    .filter((p): p is ProjectPractice => p !== null);
+}
+
+/**
+ * PlanIt agent values across all applications of a project, deduplicated by
+ * normalised company|person|address. Read-only application data — never
+ * stored. Blank and "?" placeholder values are ignored, stray leading/trailing
+ * quotes trimmed (known fetcher data-quality issues).
+ */
+export async function getProjectAgents(
+  projectId: number
+): Promise<ProjectAgent[]> {
+  const supabase = await createClient();
+
+  const { data: members, error: mErr } = await supabase
+    .from("project_applications")
+    .select("uid")
+    .eq("project_id", projectId);
+  if (mErr) throw mErr;
+  if (!members?.length) return [];
+
+  const { data: apps, error } = await supabase
+    .from("applications")
+    .select("reference, agent_company, agent_name, agent_address")
+    .in(
+      "uid",
+      members.map((m) => m.uid as string)
+    );
+  if (error) throw error;
+
+  const clean = (v: string | null): string | null => {
+    if (v == null) return null;
+    const t = v.replace(/^['"]+|['"]+$/g, "").trim();
+    return t === "" || t === "?" ? null : t;
+  };
+
+  const byKey = new Map<string, ProjectAgent>();
+  for (const a of apps ?? []) {
+    const company = clean(a.agent_company as string | null);
+    const name = clean(a.agent_name as string | null);
+    const address = clean(a.agent_address as string | null);
+    if (!company && !name) continue;
+    const key = [company, name, address]
+      .map((v) => (v ?? "").toLowerCase())
+      .join("|");
+    const existing = byKey.get(key);
+    const reference = (a.reference as string | null) ?? null;
+    if (existing) {
+      if (reference && !existing.references.includes(reference))
+        existing.references.push(reference);
+    } else {
+      byKey.set(key, {
+        agent_company: company,
+        agent_name: name,
+        agent_address: address,
+        references: reference ? [reference] : [],
+      });
+    }
+  }
+
+  return [...byKey.values()].sort((a, b) =>
+    (a.agent_company ?? a.agent_name ?? "").localeCompare(
+      b.agent_company ?? b.agent_name ?? ""
+    )
+  );
+}
+
+/** Search the shared practice register by name (case-insensitive). */
+export async function searchPractices(
+  query: string,
+  limit = 10
+): Promise<Practice[]> {
+  const supabase = await createClient();
+  const like = `%${query.replace(/[%,()]/g, " ")}%`;
+  const { data, error } = await supabase
+    .from("ui_practices")
+    .select("*")
+    .ilike("name", like)
+    .order("name", { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as Practice[];
 }
 
 export async function getBoroughs(): Promise<string[]> {

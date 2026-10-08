@@ -9,9 +9,9 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, CircleAlert, File, FolderTree, Star } from "lucide-react";
+import { ArrowDown, ArrowUp, Building2, CircleAlert, File, FolderTree, Star, UserSearch } from "lucide-react";
 import { toggleProjectStar } from "@/lib/actions";
-import type { ProjectFeedRow } from "@/lib/types";
+import type { PracticeStatus, ProjectFeedRow } from "@/lib/types";
 import type { ProjectFilters } from "@/lib/project-filters";
 import { projectFiltersToParams } from "@/lib/project-filters";
 import { formatDate } from "@/lib/dates";
@@ -90,6 +90,32 @@ function ProjectStateIcon({ row }: { row: ProjectRow }) {
   return (
     <span title="Single application (no related applications yet)">
       <File className="size-4 text-zinc-400" />
+    </span>
+  );
+}
+
+/**
+ * Three-state practice signal: none / PlanIt agent present (unverified) /
+ * verified practice assigned (overrides agent).
+ */
+function PracticeStatusCell({ status }: { status: PracticeStatus }) {
+  if (status === "assigned") {
+    return (
+      <span title="Practice assigned (verified)">
+        <Building2 className="size-4 text-emerald-600" />
+      </span>
+    );
+  }
+  if (status === "agent") {
+    return (
+      <span title="PlanIt agent present — no verified practice assigned yet">
+        <UserSearch className="size-4 text-amber-500" />
+      </span>
+    );
+  }
+  return (
+    <span title="No practice signal">
+      <Building2 className="size-4 text-muted-foreground/30" />
     </span>
   );
 }
@@ -183,6 +209,12 @@ export function ProjectsTable({
       header: "",
       size: 28,
       cell: ({ row }) => <StarCell row={row.original} />,
+    },
+    {
+      id: "practice",
+      header: "",
+      size: 28,
+      cell: ({ row }) => <PracticeStatusCell status={row.original.practice_status} />,
     },
     {
       accessorKey: "name",

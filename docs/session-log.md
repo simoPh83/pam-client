@@ -126,3 +126,98 @@ path in production — see "Performance debugging" above for final numbers.
 - Project detail page tabs (spec §4), practices UI (§5), alerts inbox +
   settings (§6) — the `practices`/`project_practices`/`ui_alert_rules`/
   `ui_alerts` tables are not yet created (deliverable 1 of the spec).
+
+# Session log — 2026-10-08
+
+Practices integration (spec: docs/2026.10.08-practices-integration-brief.md,
+updated this session with the agent-promotion addition).
+
+Decisions made together:
+- Assign-practice flow is a **centred modal** on the project page.
+- Contacts belong to the practice and are **all available from the
+  assignment** (no per-assignment contact selection in v1).
+- Practices are **editable/removable by all** authenticated users; deletion
+  blocked while project assignments exist (FK restrict).
+- The project page's PlanIt agents block is **derived data** (query over
+  `project_applications` → `applications`), not a stored field.
+
+### Migration `supabase/migrations/004_practices.sql` (applied)
+
+- `ui_practices` (name unique case-insensitively via `lower(name)` index,
+  website, notes, attribution cols, `updated_at` trigger).
+- `ui_practice_contacts` (practice_id FK cascade; name/email/phone/role/notes).
+- `ui_project_practices` (project_id FK cascade, practice_id FK **restrict**,
+  role + notes on the link, unique(project_id, practice_id)).
+- RLS on all three: authenticated full access, anon revoked — same pattern
+  as migration 002.
+- `projects_feed` gains trailing `practice_status` column:
+  `assigned` (exists ui_project_practices) overrides `agent` (any application
+  in the project has non-blank, non-`?` PlanIt agent data) else `none`.
+- Indexes: `project_applications(project_id, uid)`,
+  `applications(uid) include (agent_company, agent_name)`,
+  assignment/contact FK indexes.
+- Smoke-tested at DB level (then cleaned up): duplicate practice name 23505,
+  duplicate assignment 23505, delete-while-assigned 23503, contact cascade.
+
+### Code
+
+- `lib/types.ts` — `PracticeStatus`, `Practice`, `PracticeContact`,
+  `ProjectPractice` (assignment + practice + contacts), `ProjectAgent`;
+  `projects_feed` row gains `practice_status`.
+- `lib/project-filters.ts` + `components/projects-filters.tsx` — new
+  `practice` filter (any / none / agent / assigned).
+- `components/projects-table.tsx` — practice icon column (muted building =
+  none, amber user-search = agent present, emerald building = assigned).
+- `lib/queries.ts` — `getProjectPractices()`, `getProjectAgents()`
+  (dedupes by normalised company|person|address; strips stray quotes and
+  `?` placeholders), `searchPractices()`; feed query applies practice filter.
+- `lib/actions.ts` — practice/contact/assignment CRUD returning result
+  objects (duplicate-name conflicts return the existing record so the UI can
+  offer it; assignment revalidates `/lead` + `/`).
+- `components/ui/dialog.tsx` (new shadcn primitive, radix-ui),
+  `components/assign-practice-dialog.tsx` (search → select/create → contacts
+  → role+note → assign, centred modal),
+  `components/practices-section.tsx` (assignment cards: edit role/note, edit
+  practice + delete, contacts add/edit/delete, two-step unassign),
+  `components/project-agents.tsx` (read-only PlanIt agents block, labelled
+  "read-only · application data").
+- `app/(app)/lead/page.tsx` — persistent project-level row under the tabs:
+  PracticesSection + ProjectAgents, rendered for every application tab.
+
+Validation: `pnpm typecheck`, `pnpm lint` (only pre-existing TanStack
+warning), `pnpm build` all pass. Live DB: ~75k/179k applications carry agent
+data; ~33k/85k projects → `practice_status = 'agent'`.
+
+## Not yet done (future sessions)
+
+- Interactive browser test pass of the practice flows (needs sign-in).
+- Practice **register page** (brief §5: search/list/edit all practices) —
+  v1 manages practices from the project page only.
+- True client-side application-tab switching so project context is not
+  refetched (brief §2) — currently a full navigation per tab.
+
+## Practice-status filter performance fix (same evening)
+
+Filtering the feed by `practice_status` timed out (57014, >8s Supabase
+statement timeout): the filter sits on a computed CASE column, so every
+candidate row ran the per-member `applications` EXISTS probe (~20k candidates
+× joins; 3.4s even warm as superuser, worse via PostgREST).
+
+### Migration `supabase/migrations/005_agent_presence.sql` (applied)
+
+- `ui_project_agent_presence (project_id pk)` — trigger-maintained cache of
+  "project has ≥1 application with a meaningful PlanIt agent".
+- Triggers on fetcher-owned `project_applications` (project_id/uid changes)
+  and `applications` (agent_company/agent_name changes) recompute affected
+  projects; `security definer` functions so the fetcher role can fire them.
+  **Caveat:** if the fetcher ever drops/recreates those tables the triggers
+  vanish — re-run `pnpm migrate` to restore (idempotent, refills the cache).
+- `projects_feed.practice_status` now probes this PK table for 'agent'.
+- Migration 003 switched to DROP+CREATE for the view (replays failed with
+  "cannot drop columns from view" once 004 appended a column); the runner
+  applies all files in order, so the final definition always wins.
+
+Timings after fix (count, 90-day window, ~20.9k rows): default 1667ms,
+assigned 185ms, agent 74ms, none 77ms; filtered page ~94ms. Cache verified
+against ground truth (33,360 = 33,360). The default count (~1.7s warm)
+remains the known exact-count hot path from 2026-10-07.

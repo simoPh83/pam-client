@@ -1,0 +1,10 @@
+Another feature to develop I'd say is the merging of the planIt returning agent at application level with our practices at project level.
+
+Ideally: application level planIt agents and addresses to be promoted at project level which collects them all. (This is a would say a dB view rather than a real new field in a table, right?).
+
+In a project page, I'd like to see (in the fixed project section discussed in the other doc) all the agents planIt returned in all applications in that project group. They should be clearly marked as read-only and as "application data".
+A user should basically manyally check the agent is actually the architectural practice he's looking for, browsing in the application docs. At that point he would insert the practice in the db through the form I mentioned earlier. Practices are editable by all, removable, can be added, assigned etc, there's no user hierarchy in this project.
+
+In the homepage (the projects list page) add another field (an icon) with the 3 possible statuses: no practice assigned (no agent from planIt, nor user assigned), agent present, practice assigned (practice assigned overrides agent present). These should also be filter criterias. 
+
+Feel free to review this brief please and add these details to the other doc. Lets discuss together then start implementing.

@@ -2,6 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import type { Practice, PracticeContact } from "@/lib/types";
+
+type Result<T = undefined> =
+  | (T extends undefined ? { ok: true } : { ok: true; data: T })
+  | { ok: false; error: string; conflict?: Practice };
+
+function fail(error: unknown, fallback: string): { ok: false; error: string } {
+  return { ok: false, error: error instanceof Error ? error.message : fallback };
+}
 
 export async function addOutreachEntry(
   uid: string,
@@ -60,6 +69,279 @@ export async function toggleProjectStar(projectId: number, starred: boolean) {
 
   revalidatePath("/lead");
   revalidatePath("/");
+}
+
+// ---------------------------------------------------------------------------
+// Practices (shared register — see docs/2026.10.08-practices-integration-brief.md)
+// These actions return result objects instead of throwing so the UI can show
+// validation/duplicate errors explicitly.
+// ---------------------------------------------------------------------------
+
+export async function searchPracticesAction(
+  query: string
+): Promise<Result<Practice[]>> {
+  const supabase = await createClient();
+  const like = `%${query.replace(/[%,()]/g, " ")}%`;
+  const { data, error } = await supabase
+    .from("ui_practices")
+    .select("*")
+    .ilike("name", like)
+    .order("name", { ascending: true })
+    .limit(10);
+  if (error) return fail(error.message, "Search failed");
+  return { ok: true, data: (data ?? []) as Practice[] };
+}
+
+export async function getPracticeContactsAction(
+  practiceId: string
+): Promise<Result<PracticeContact[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ui_practice_contacts")
+    .select("*")
+    .eq("practice_id", practiceId)
+    .order("created_at", { ascending: true });
+  if (error) return fail(error.message, "Could not load contacts");
+  return { ok: true, data: (data ?? []) as PracticeContact[] };
+}
+
+export async function createPractice(input: {
+  name: string;
+  website: string | null;
+  notes: string | null;
+}): Promise<Result<Practice>> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Practice name is required" };
+
+  const { data, error } = await supabase
+    .from("ui_practices")
+    .insert({
+      name,
+      website: input.website?.trim() || null,
+      notes: input.notes?.trim() || null,
+      created_by: user.id,
+      created_by_email: user.email ?? null,
+    })
+    .select()
+    .single();
+  if (error) {
+    // Case-insensitive unique violation on lower(name): offer the existing record.
+    if (error.code === "23505") {
+      const { data: existing } = await supabase
+        .from("ui_practices")
+        .select("*")
+        .ilike("name", name)
+        .limit(1)
+        .maybeSingle();
+      return {
+        ok: false,
+        error: `A practice named “${name}” already exists`,
+        conflict: (existing ?? undefined) as Practice | undefined,
+      };
+    }
+    return fail(error.message, "Could not create practice");
+  }
+
+  revalidatePath("/lead");
+  revalidatePath("/");
+  return { ok: true, data: data as Practice };
+}
+
+export async function updatePractice(
+  id: string,
+  input: { name: string; website: string | null; notes: string | null }
+): Promise<Result<Practice>> {
+  const supabase = await createClient();
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Practice name is required" };
+
+  const { data, error } = await supabase
+    .from("ui_practices")
+    .update({
+      name,
+      website: input.website?.trim() || null,
+      notes: input.notes?.trim() || null,
+    })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) {
+    if (error.code === "23505")
+      return { ok: false, error: `A practice named “${name}” already exists` };
+    return fail(error.message, "Could not update practice");
+  }
+
+  revalidatePath("/lead");
+  return { ok: true, data: data as Practice };
+}
+
+export async function deletePractice(id: string): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("ui_practices").delete().eq("id", id);
+  if (error) {
+    // FK restrict on ui_project_practices.practice_id.
+    if (error.code === "23503")
+      return {
+        ok: false,
+        error:
+          "This practice is still assigned to projects — unassign it first",
+      };
+    return fail(error.message, "Could not delete practice");
+  }
+
+  revalidatePath("/lead");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function addPracticeContact(
+  practiceId: string,
+  input: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+    role: string | null;
+    notes: string | null;
+  }
+): Promise<Result<PracticeContact>> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Contact name is required" };
+
+  const { data, error } = await supabase
+    .from("ui_practice_contacts")
+    .insert({
+      practice_id: practiceId,
+      name,
+      email: input.email?.trim() || null,
+      phone: input.phone?.trim() || null,
+      role: input.role?.trim() || null,
+      notes: input.notes?.trim() || null,
+      created_by: user.id,
+      created_by_email: user.email ?? null,
+    })
+    .select()
+    .single();
+  if (error) return fail(error.message, "Could not add contact");
+
+  revalidatePath("/lead");
+  return { ok: true, data: data as PracticeContact };
+}
+
+export async function updatePracticeContact(
+  id: string,
+  input: {
+    name: string;
+    email: string | null;
+    phone: string | null;
+    role: string | null;
+    notes: string | null;
+  }
+): Promise<Result<PracticeContact>> {
+  const supabase = await createClient();
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: "Contact name is required" };
+
+  const { data, error } = await supabase
+    .from("ui_practice_contacts")
+    .update({
+      name,
+      email: input.email?.trim() || null,
+      phone: input.phone?.trim() || null,
+      role: input.role?.trim() || null,
+      notes: input.notes?.trim() || null,
+    })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) return fail(error.message, "Could not update contact");
+
+  revalidatePath("/lead");
+  return { ok: true, data: data as PracticeContact };
+}
+
+export async function deletePracticeContact(id: string): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ui_practice_contacts")
+    .delete()
+    .eq("id", id);
+  if (error) return fail(error.message, "Could not delete contact");
+
+  revalidatePath("/lead");
+  return { ok: true };
+}
+
+export async function assignPractice(
+  projectId: number,
+  practiceId: string,
+  input: { role: string | null; notes: string | null }
+): Promise<Result> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+
+  const { error } = await supabase.from("ui_project_practices").insert({
+    project_id: projectId,
+    practice_id: practiceId,
+    role: input.role?.trim() || null,
+    notes: input.notes?.trim() || null,
+    created_by: user.id,
+    created_by_email: user.email ?? null,
+  });
+  if (error) {
+    if (error.code === "23505")
+      return { ok: false, error: "This practice is already assigned to the project" };
+    return fail(error.message, "Could not assign practice");
+  }
+
+  revalidatePath("/lead");
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function updateProjectPractice(
+  id: string,
+  input: { role: string | null; notes: string | null }
+): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ui_project_practices")
+    .update({
+      role: input.role?.trim() || null,
+      notes: input.notes?.trim() || null,
+    })
+    .eq("id", id);
+  if (error) return fail(error.message, "Could not update assignment");
+
+  revalidatePath("/lead");
+  return { ok: true };
+}
+
+export async function unassignPractice(id: string): Promise<Result> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ui_project_practices")
+    .delete()
+    .eq("id", id);
+  if (error) return fail(error.message, "Could not unassign practice");
+
+  revalidatePath("/lead");
+  revalidatePath("/");
+  return { ok: true };
 }
 
 export async function updateProjectMeta(

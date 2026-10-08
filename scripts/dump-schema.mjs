@@ -22,7 +22,9 @@ const { rows } = await client.query(`
     and table_name in ('applications', 'applications_full', 'state_history',
                        'jobs', 'leads', 'ui_outreach', 'ui_lead_meta',
                        'ui_saved_filters', 'authority_urls',
-                       'projects', 'project_applications')
+                       'projects', 'project_applications',
+                       'ui_practices', 'ui_practice_contacts',
+                       'ui_project_practices')
   order by table_name, ordinal_position
 `);
 
