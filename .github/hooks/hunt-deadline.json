@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "node scripts/hunt-deadline.mjs",
+        "timeout": 5
+      }
+    ]
+  }
+}

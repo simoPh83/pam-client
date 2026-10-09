@@ -1,0 +1,7 @@
+{
+  "chat.tools.terminal.autoApprove": {
+    "node scripts/": true,
+    "curl": true,
+    "Invoke-WebRequest": true
+  }
+}
