@@ -79,8 +79,18 @@ the DB lookup fails or the user explicitly asks for app screenshots.
 
 ## Known portal quirks (update this list as you discover more)
 
-- **Idox portals** (Ealing, Southwark, …): fetch the documents tab HTML, extract
-  PDF links, use `extract-pdf.mjs` with `--referer`.
+- **Idox portals** (Ealing, Southwark, Tower Hamlets, …): fetch the documents
+  tab HTML, extract PDF links, use `extract-pdf.mjs` with `--referer`.
+  **Trap:** the portal serves files only to requests carrying a valid
+  `JSESSIONID` — without it the PDF URL returns a misleading **404 Not Found**
+  (not 401/403), so it looks like a dead link. A `Referer` header alone does
+  NOT help. The fix is a session: either use `extract-pdf.mjs --referer
+  <docsUrl>` (it fetches the page and forwards the cookie), or in PowerShell
+  fetch any portal page with `-SessionVariable s` then download the PDF with
+  `-WebSession $s`. Gotcha: the cookie is path-scoped
+  (`path=/online-applications`), so `$s.Cookies.GetCookies(<root URL>)` shows
+  an empty jar even when the session works — verify against a URL under
+  `/online-applications` instead.
 - **Agile Applications portals** (Islington, …): the UI rate-limits browsers
   (HTTP 429). Call the backend API directly instead:
   `https://planningapi.agileapplications.co.uk/…` with headers
