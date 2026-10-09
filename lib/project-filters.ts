@@ -23,10 +23,11 @@ export type ProjectFilters = {
   page: number; // 1-based
 };
 
-export function daysAgo(n: number): string {
+export function monthsAgo(n: number): string {
   const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
+  d.setMonth(d.getMonth() - n);
+  const pad = (x: number) => String(x).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function defaultProjectFilters(): ProjectFilters {
@@ -34,7 +35,7 @@ export function defaultProjectFilters(): ProjectFilters {
     boroughs: [],
     filedFrom: null,
     filedTo: null,
-    updatedFrom: daysAgo(90),
+    updatedFrom: monthsAgo(3),
     updatedTo: null,
     rootStatus: [],
     practice: null,
@@ -73,7 +74,7 @@ export function parseProjectFilters(
     boroughs: str("borough")?.split(",").filter(Boolean) ?? [],
     filedFrom: str("filedFrom"),
     filedTo: str("filedTo"),
-    // "updatedFrom=any" lets the user clear the default 90-day window.
+    // "updatedFrom=any" lets the user clear the default 3-month window.
     updatedFrom: updatedFrom === "any" ? null : (updatedFrom ?? d.updatedFrom),
     updatedTo: str("updatedTo"),
     rootStatus: (str("rootStatus")?.split(",") ?? []).filter((s): s is RootStatusGroup =>

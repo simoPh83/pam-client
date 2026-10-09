@@ -1,13 +1,9 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "@/lib/supabase/actions";
 import { Button } from "@/components/ui/button";
-
-const NAV = [
-  { href: "/", label: "Leads" },
-  { href: "/outreach", label: "Outreach" },
-  { href: "/status", label: "Status" },
-];
+import { SiteNav } from "@/components/site-nav";
 
 export async function SiteHeader() {
   const supabase = await createClient();
@@ -21,17 +17,9 @@ export async function SiteHeader() {
         <Link href="/" className="font-semibold">
           PAM
         </Link>
-        <nav className="flex gap-4 text-sm">
-          {NAV.map((n) => (
-            <Link
-              key={n.href}
-              href={n.href}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              {n.label}
-            </Link>
-          ))}
-        </nav>
+        <Suspense>
+          <SiteNav />
+        </Suspense>
         <div className="ml-auto flex items-center gap-3">
           <span className="text-xs text-muted-foreground">{user?.email}</span>
           <form action={signOut}>

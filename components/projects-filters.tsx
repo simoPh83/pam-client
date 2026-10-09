@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ProjectFilters, RootStatusGroup } from "@/lib/project-filters";
-import { projectFiltersToParams } from "@/lib/project-filters";
+import { defaultProjectFilters, projectFiltersToParams } from "@/lib/project-filters";
 import type { PracticeStatus } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +74,21 @@ export function ProjectsFilters({
       ...overrides,
     };
     router.push(`/?${projectFiltersToParams(next).toString()}`);
+  }
+
+  function reset() {
+    const d = defaultProjectFilters();
+    setQ("");
+    setDesc("");
+    setFiledFrom("");
+    setFiledTo("");
+    setUpdatedFrom(d.updatedFrom ?? "");
+    setUpdatedTo("");
+    setBoroughSel([]);
+    setStatusSel([]);
+    setPracticeSel("any");
+    setStarred(false);
+    router.push("/");
   }
 
   function toggle<T>(list: T[], v: T, set: (x: T[]) => void) {
@@ -162,7 +177,9 @@ export function ProjectsFilters({
         </DropdownMenu>
       </div>
 
-      <div className="space-y-1">
+      {/* flex-col instead of space-y: Radix adds a hidden native <select> sibling
+          inside forms, which makes space-y add a stray bottom margin. */}
+      <div className="flex flex-col gap-1">
         <Label className="text-xs">Assigned Practice</Label>
         <Select
           value={practiceSel}
@@ -239,7 +256,7 @@ export function ProjectsFilters({
           variant="ghost"
           size="sm"
           className="h-8"
-          onClick={() => router.push("/")}
+          onClick={reset}
         >
           Reset
         </Button>

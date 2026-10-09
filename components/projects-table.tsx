@@ -120,7 +120,7 @@ function PracticeStatusCell({ status }: { status: PracticeStatus }) {
   );
 }
 
-/** Star toggle: solid = starred by you, dimmed = starred by others only. */
+/** Star toggle: solid = starred by you, light blue = starred by others only. */
 function StarCell({ row }: { row: ProjectRow }) {
   const [starred, setStarred] = useState(row.starred_by_me);
   const [pending, startTransition] = useTransition();
@@ -148,7 +148,7 @@ function StarCell({ row }: { row: ProjectRow }) {
           starred
             ? "fill-yellow-400 text-yellow-400"
             : row.starred_by_others
-              ? "fill-yellow-400/30 text-yellow-400/50"
+              ? "fill-sky-300 text-sky-400"
               : "text-muted-foreground/40"
         )}
       />
