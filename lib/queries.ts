@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
   ApplicationFull,
+  GroupingReview,
+  GroupingReviewCandidate,
   Job,
   Lead,
   OutreachEntry,
@@ -8,12 +10,14 @@ import type {
   PracticeContact,
   ProjectAgent,
   ProjectFeedRow,
+  ProjectGroupingReview,
   ProjectMeta,
   ProjectPractice,
   StateHistoryRow,
+  UnlinkedNoSchemeRow,
 } from "@/lib/types";
 import { PAGE_SIZE, type ProjectFilters } from "@/lib/project-filters";
-import type { Project, ProjectMembership } from "@/lib/types";
+import type { GroupingState, Project, ProjectMembership } from "@/lib/types";
 
 export { PAGE_SIZE } from "@/lib/project-filters";
 
@@ -81,7 +85,92 @@ export async function getProjectsFeed(
 
   const { data, error, count } = await query;
   if (error) throw error;
-  const rows = (data ?? []) as ProjectFeedRow[];
+  const rows = (data ?? []) as Omit<
+    ProjectFeedRow,
+    "address_key" | "grouping_state" | "unlinked_application_count"
+  >[];
+  const projectIds = rows.map((row) => row.id);
+  const projectById = new Map<
+    number,
+    { address_key: string | null; grouping_state: GroupingState }
+  >();
+
+  if (projectIds.length) {
+    const { data: projects, error: projectsError } = await supabase
+      .from("projects")
+      .select("id, address_key, grouping_state")
+      .in("id", projectIds);
+    if (projectsError) throw projectsError;
+
+    for (const project of projects ?? []) {
+      const state = project.grouping_state as GroupingState;
+      if (!["clean", "provisional", "ambiguous"].includes(state)) {
+        throw new Error(`Project ${project.id} has an unknown grouping state`);
+      }
+      projectById.set(project.id as number, {
+        address_key: (project.address_key as string | null) ?? null,
+        grouping_state: state,
+      });
+    }
+
+    const missingProject = projectIds.find((id) => !projectById.has(id));
+    if (missingProject != null) {
+      throw new Error(`Grouping metadata is missing for project ${missingProject}`);
+    }
+  }
+
+  const unlinkedCounts = new Map<number, number>();
+  const addressKeys = [
+    ...new Set(
+      projectIds
+        .map((id) => projectById.get(id)?.address_key)
+        .filter((key): key is string => Boolean(key))
+    ),
+  ];
+  const authorities = [...new Set(rows.map((row) => row.authority).filter(
+    (authority): authority is string => Boolean(authority)
+  ))];
+  if (addressKeys.length && authorities.length) {
+    const { data: reviews, error: reviewsError } = await supabase
+      .from("grouping_review")
+      .select("id, authority, address_key, candidates")
+      .eq("reason", "unlinked_multi_scheme")
+      .eq("status", "pending")
+      .in("address_key", addressKeys)
+      .in("authority", authorities);
+    if (reviewsError) throw reviewsError;
+
+    const projectIdsByAddress = new Map<string, Set<number>>();
+    const authorityByProjectId = new Map(
+      rows.map((row) => [row.id, row.authority])
+    );
+    for (const id of projectIds) {
+      const project = projectById.get(id);
+      const authority = authorityByProjectId.get(id);
+      if (!project?.address_key || !authority) continue;
+      const key = `${authority}\u001f${project.address_key}`;
+      const ids = projectIdsByAddress.get(key) ?? new Set<number>();
+      ids.add(id);
+      projectIdsByAddress.set(key, ids);
+    }
+
+    for (const review of reviews ?? []) {
+      const key = `${review.authority}\u001f${review.address_key}`;
+      const matchingIds = projectIdsByAddress.get(key);
+      if (!matchingIds) continue;
+
+      const reviewCandidateIds = new Set(
+        ((review.candidates ?? []) as GroupingReviewCandidate[])
+          .map((candidate) => Number(candidate.project_id))
+          .filter((id) => Number.isSafeInteger(id))
+      );
+      for (const id of matchingIds) {
+        if (reviewCandidateIds.has(id)) {
+          unlinkedCounts.set(id, (unlinkedCounts.get(id) ?? 0) + 1);
+        }
+      }
+    }
+  }
 
   // For projects whose root isn't in the DB, annotate with the parent-hunt
   // status so the UI can explain ("being fetched" vs "not found").
@@ -104,10 +193,138 @@ export async function getProjectsFeed(
   }
 
   return {
-    rows: rows.map((r) => ({
-      ...r,
-      missing_parent_status: statusByProject.get(r.id) ?? null,
-    })),
+    rows: rows.map((r) => {
+      const project = projectById.get(r.id);
+      if (!project) {
+        throw new Error(`Grouping metadata is missing for project ${r.id}`);
+      }
+      return {
+        ...r,
+        address_key: project.address_key,
+        grouping_state: project.grouping_state,
+        unlinked_application_count: unlinkedCounts.get(r.id) ?? 0,
+        missing_parent_status: statusByProject.get(r.id) ?? null,
+      };
+    }),
+    total: count ?? 0,
+  };
+}
+
+/** Pending review items that are relevant to a scheme's project page. */
+export async function getProjectGroupingReviews(
+  project: Project
+): Promise<ProjectGroupingReview[]> {
+  const supabase = await createClient();
+  const [multiRootResult, unlinkedResult] = await Promise.all([
+    supabase
+      .from("grouping_review")
+      .select("*")
+      .eq("reason", "multi_root")
+      .eq("status", "pending")
+      .eq("project_id", project.id)
+      .order("created_at", { ascending: true }),
+    project.address_key
+      ? supabase
+          .from("grouping_review")
+          .select("*")
+          .eq("reason", "unlinked_multi_scheme")
+          .eq("status", "pending")
+          .eq("authority", project.authority)
+          .eq("address_key", project.address_key)
+          .order("created_at", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (multiRootResult.error) throw multiRootResult.error;
+  if (unlinkedResult.error) throw unlinkedResult.error;
+
+  const multiRootReviews = (multiRootResult.data ?? []) as GroupingReview[];
+  const unlinkedReviews = ((unlinkedResult.data ?? []) as GroupingReview[]).filter(
+    (review) =>
+      review.candidates.some(
+        (candidate) => Number(candidate.project_id) === project.id
+      )
+  );
+  const reviews = [...multiRootReviews, ...unlinkedReviews];
+  const orphanUids = [
+    ...new Set(
+      unlinkedReviews
+        .map((review) => review.uid)
+        .filter((uid): uid is string => Boolean(uid))
+    ),
+  ];
+
+  const { data: applications, error: applicationsError } = orphanUids.length
+    ? await supabase
+        .from("applications")
+        .select("uid, reference, description, app_type, start_date")
+        .in("uid", orphanUids)
+    : { data: [], error: null };
+  if (applicationsError) throw applicationsError;
+  const appByUid = new Map((applications ?? []).map((app) => [app.uid, app]));
+
+  return reviews.map((review) => {
+    const orphan = review.uid ? appByUid.get(review.uid) : null;
+    return {
+      ...review,
+      candidates: (review.candidates ?? []) as GroupingReviewCandidate[],
+      orphan: orphan
+        ? {
+            uid: orphan.uid as string,
+            reference: (orphan.reference as string | null) ?? null,
+            description: (orphan.description as string | null) ?? null,
+            app_type: (orphan.app_type as string | null) ?? null,
+            start_date: (orphan.start_date as string | null) ?? null,
+          }
+        : null,
+    };
+  });
+}
+
+/** Page of parentless applications that currently have no scheme to join. */
+export async function getUnlinkedNoSchemeReviews(
+  page = 1
+): Promise<{ rows: UnlinkedNoSchemeRow[]; total: number }> {
+  const supabase = await createClient();
+  const safePage = Math.max(1, page);
+  const { data: reviews, error, count } = await supabase
+    .from("grouping_review")
+    .select("id, uid, authority, address_key, created_at", { count: "exact" })
+    .eq("reason", "unlinked_no_scheme")
+    .eq("status", "pending")
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
+    .range((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE - 1);
+  if (error) throw error;
+
+  const reviewRows = (reviews ?? []).filter(
+    (review): review is typeof review & { uid: string } =>
+      typeof review.uid === "string" && review.uid.length > 0
+  );
+  const uids = reviewRows.map((review) => review.uid);
+  const { data: applications, error: applicationsError } = uids.length
+    ? await supabase
+        .from("applications")
+        .select("uid, address, reference, description, app_type")
+        .in("uid", uids)
+    : { data: [], error: null };
+  if (applicationsError) throw applicationsError;
+
+  const appByUid = new Map((applications ?? []).map((app) => [app.uid, app]));
+  return {
+    rows: reviewRows.map((review) => {
+      const app = appByUid.get(review.uid);
+      return {
+        id: review.id as number,
+        uid: review.uid,
+        authority: review.authority as string,
+        address_key: (review.address_key as string | null) ?? null,
+        address: (app?.address as string | null) ?? null,
+        reference: (app?.reference as string | null) ?? null,
+        description: (app?.description as string | null) ?? null,
+        app_type: (app?.app_type as string | null) ?? null,
+        created_at: review.created_at as string,
+      };
+    }),
     total: count ?? 0,
   };
 }

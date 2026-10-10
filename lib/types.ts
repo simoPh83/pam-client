@@ -31,13 +31,16 @@ export type Project = {
   id: number;
   authority: string;
   name: string | null;
-  address_key: string;
+  address_key: string | null;
   root_uid: string | null;
   latest_uid: string | null;
   n_applications: number;
+  grouping_state: GroupingState;
   first_seen: string | null;
   last_updated: string | null;
 };
+
+export type GroupingState = "clean" | "provisional" | "ambiguous";
 
 export type ProjectMembership = {
   project_id: number;
@@ -45,6 +48,57 @@ export type ProjectMembership = {
   parent_ref: string | null;
   is_root: boolean;
   role: "original" | "variation" | "discharge" | "nma" | null;
+  linked_by: "reference" | "inferred" | "manual";
+};
+
+export type GroupingReviewReason =
+  | "multi_root"
+  | "unlinked_multi_scheme"
+  | "unlinked_no_scheme";
+
+export type GroupingReviewCandidate = {
+  project_id: number;
+  uid: string | null;
+  description: string | null;
+  app_type: string | null;
+  start_date: string | null;
+  grouping_state: GroupingState | null;
+  n_applications: number | null;
+};
+
+export type GroupingReview = {
+  id: number;
+  authority: string;
+  project_id: number | null;
+  address_key: string | null;
+  uid: string | null;
+  reason: GroupingReviewReason;
+  candidates: GroupingReviewCandidate[];
+  status: "pending" | "resolved" | "dismissed";
+  resolution: string | null;
+  created_at: string;
+};
+
+export type ProjectGroupingReview = GroupingReview & {
+  orphan: {
+    uid: string;
+    reference: string | null;
+    description: string | null;
+    app_type: string | null;
+    start_date: string | null;
+  } | null;
+};
+
+export type UnlinkedNoSchemeRow = {
+  id: number;
+  uid: string;
+  authority: string;
+  address_key: string | null;
+  address: string | null;
+  reference: string | null;
+  description: string | null;
+  app_type: string | null;
+  created_at: string;
 };
 
 export type ApplicationFull = Lead & {
@@ -129,7 +183,10 @@ export type ProjectFeedRow = {
   id: number;
   authority: string;
   name: string | null;
+  address_key: string | null;
   n_applications: number;
+  grouping_state: GroupingState;
+  unlinked_application_count: number;
   root_in_db: boolean | null;
   first_seen: string | null;
   last_updated: string | null;

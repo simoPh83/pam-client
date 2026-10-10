@@ -18,6 +18,12 @@ const ROLE_LABEL: Record<string, string> = {
   nma: "NMA",
 };
 
+const LINKED_BY_LABEL: Record<ProjectMembership["linked_by"], string> = {
+  reference: "reference link",
+  inferred: "address inference",
+  manual: "manual review",
+};
+
 // Label for a member tab: only the root is "Original"; other original-role
 // members are sibling full applications.
 function roleLabel(m: ProjectMembership): string {
@@ -43,7 +49,7 @@ export function ProjectTabs({
     <div className="rounded-md border">
       <div className="border-b px-3 py-2 text-xs text-muted-foreground">
         Project: <span className="font-medium text-foreground">{projectName}</span>{" "}
-        · {members.length} applications on this site
+        · {members.length} applications in this scheme
       </div>
       <div
         role="tablist"
@@ -56,7 +62,7 @@ export function ProjectTabs({
               key={m.uid}
               role="tab"
               aria-selected={isCurrent}
-              title={`${m.reference ?? m.uid} — ${roleLabel(m)}${m.app_state ? ` — ${m.app_state}` : ""}`}
+              title={`${m.reference ?? m.uid} — ${roleLabel(m)}${m.app_state ? ` — ${m.app_state}` : ""} — linked by ${LINKED_BY_LABEL[m.linked_by]}`}
               onClick={() => router.push(`/lead?uid=${encodeURIComponent(m.uid)}`)}
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-xs transition-colors",

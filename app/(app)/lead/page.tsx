@@ -4,6 +4,7 @@ import {
   getLeadDetail,
   getProjectAgents,
   getProjectBundle,
+  getProjectGroupingReviews,
   getProjectPractices,
 } from "@/lib/queries";
 import { formatDate } from "@/lib/dates";
@@ -13,6 +14,7 @@ import { LeadMetaSection } from "@/components/lead-meta-section";
 import { PracticesSection } from "@/components/practices-section";
 import { ProjectAgents } from "@/components/project-agents";
 import { ProjectTabs } from "@/components/project-tabs";
+import { ProjectGroupingReview } from "@/components/project-grouping-review";
 
 // Always re-query Supabase per request — the page reads live project/outreach
 // data that changes between deploys and syncs.
@@ -47,13 +49,14 @@ export default async function LeadDetailPage({
   // Project-level data (persistent across application tabs): shared practice
   // assignments and the read-only aggregation of PlanIt agents.
   const projectId = app.project_id != null ? Number(app.project_id) : null;
-  const [assignments, agents] =
-    projectId != null
+  const [assignments, agents, groupingReviews] =
+    projectId != null && project
       ? await Promise.all([
           getProjectPractices(projectId),
           getProjectAgents(projectId),
+          getProjectGroupingReviews(project),
         ])
-      : [[], []];
+      : [[], [], []];
 
   const links = [
     { label: "Council page", url: app.council_url },
@@ -77,6 +80,9 @@ export default async function LeadDetailPage({
         currentUid={uid}
         projectName={project?.name ?? null}
       />
+      {project && (
+        <ProjectGroupingReview project={project} reviews={groupingReviews} />
+      )}
       {projectId != null && (
         <div className="grid gap-4 lg:grid-cols-2">
           <PracticesSection projectId={projectId} assignments={assignments} />

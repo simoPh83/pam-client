@@ -71,6 +71,40 @@ export async function toggleProjectStar(projectId: number, starred: boolean) {
   revalidatePath("/");
 }
 
+export async function applyGroupingResolution(
+  reviewId: number,
+  resolution: string
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (!Number.isSafeInteger(reviewId) || reviewId < 1) {
+    return { ok: false, error: "Invalid grouping review." };
+  }
+  if (
+    resolution !== "merged" &&
+    resolution !== "dismiss" &&
+    !/^[1-9]\d*$/.test(resolution)
+  ) {
+    return { ok: false, error: "Invalid grouping resolution." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError) return { ok: false, error: authError.message };
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const { error } = await supabase.rpc("apply_grouping_resolution", {
+    p_review_id: reviewId,
+    p_resolution: resolution,
+  });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/");
+  revalidatePath("/lead");
+  return { ok: true };
+}
+
 // ---------------------------------------------------------------------------
 // Practices (shared register — see docs/2026.10.08-practices-integration-brief.md)
 // These actions return result objects instead of throwing so the UI can show

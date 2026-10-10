@@ -75,20 +75,20 @@ function ProjectStateIcon({ row }: { row: ProjectRow }) {
           ? "Original application found — being linked"
           : "Original application predates our records — being fetched";
     return (
-      <span title={`Root missing — ${hint}`}>
+      <span title={`Scheme root missing — ${hint}`}>
         <CircleAlert className="size-4 text-amber-500" />
       </span>
     );
   }
   if (row.n_applications > 1) {
     return (
-      <span title={`Project — root application + ${row.n_applications - 1} more`}>
+      <span title={`Scheme — root application + ${row.n_applications - 1} more`}>
         <FolderTree className="size-4 text-emerald-600" />
       </span>
     );
   }
   return (
-    <span title="Single application (no related applications yet)">
+    <span title="Single-application scheme (no related applications yet)">
       <File className="size-4 text-zinc-400" />
     </span>
   );
@@ -221,7 +221,7 @@ export function ProjectsTable({
       header: () => <SortableHead label="Project" col="name" filters={filters} />,
       size: 230,
       cell: ({ row }) => (
-        <span className="flex items-center gap-1.5">
+        <span className="flex flex-wrap items-center gap-1.5">
           <span className="min-w-0">
             <span className="block truncate text-xs font-medium" title={row.original.name ?? ""}>
               {row.original.name ?? "—"}
@@ -234,9 +234,32 @@ export function ProjectsTable({
             <Badge
               variant="secondary"
               className="size-5 shrink-0 justify-center rounded-full p-0 text-[10px]"
-              title={`${row.original.n_applications} applications in this project`}
+              title={`${row.original.n_applications} applications in this scheme`}
             >
               {row.original.n_applications}
+            </Badge>
+          )}
+          {row.original.grouping_state === "ambiguous" && (
+            <Badge
+              variant="outline"
+              className="shrink-0 border-amber-500 text-amber-700 dark:text-amber-300"
+            >
+              Multiple schemes
+            </Badge>
+          )}
+          {row.original.grouping_state === "provisional" && (
+            <Badge variant="secondary" className="shrink-0">
+              Incomplete chain
+            </Badge>
+          )}
+          {row.original.unlinked_application_count > 0 && (
+            <Badge
+              variant="outline"
+              className="shrink-0 text-muted-foreground"
+              title="Parentless follow-ups at this address that can be assigned to a scheme"
+            >
+              {row.original.unlinked_application_count} unlinked application
+              {row.original.unlinked_application_count === 1 ? "" : "s"}
             </Badge>
           )}
         </span>

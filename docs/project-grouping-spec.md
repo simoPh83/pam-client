@@ -4,6 +4,9 @@
 **For:** `simoPh83/pam` (fetcher repo) — the worker owns this. The web client
 (`pam-client`) only reads the result.
 
+> Historical address-cluster model. It is superseded by the scheme-level
+> model and review flows described in [`grouping-review-ui.md`](./grouping-review-ui.md).
+
 ## Why
 
 One physical development produces many planning applications over the years
