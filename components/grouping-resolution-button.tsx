@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { applyGroupingResolution } from "@/lib/actions";
+import { useToast } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
 
 export function GroupingResolutionButton({
@@ -16,32 +17,32 @@ export function GroupingResolutionButton({
   variant?: "outline" | "secondary";
 }) {
   const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   function apply() {
-    setError(null);
     startTransition(async () => {
       const result = await applyGroupingResolution(reviewId, resolution);
-      if (!result.ok) setError(result.error);
+      if (result.ok) {
+        toast({ variant: "success", title: label });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Could not update grouping",
+          description: result.error,
+        });
+      }
     });
   }
 
   return (
-    <div className="space-y-1">
-      <Button
-        type="button"
-        size="sm"
-        variant={variant}
-        disabled={pending}
-        onClick={apply}
-      >
-        {pending ? "Saving…" : label}
-      </Button>
-      {error && (
-        <p className="text-xs text-destructive" role="alert">
-          Could not update grouping: {error}
-        </p>
-      )}
-    </div>
+    <Button
+      type="button"
+      size="sm"
+      variant={variant}
+      disabled={pending}
+      onClick={apply}
+    >
+      {pending ? "Saving…" : label}
+    </Button>
   );
 }

@@ -7,6 +7,7 @@ import type { GroupingReviewCandidate, Project, ProjectGroupingReview, SplitRequ
 import { formatDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { GroupingResolutionButton } from "@/components/grouping-resolution-button";
+import { ManualResolutionDialog } from "@/components/manual-resolution-dialog";
 import { SplitSchemeButton } from "@/components/split-scheme-button";
 
 function CandidateDetails({
@@ -218,11 +219,23 @@ export function ProjectGroupingReview({
                   </li>
                 ))}
               </ul>
-              <GroupingResolutionButton
-                reviewId={review.id}
-                resolution="dismiss"
-                label="Dismiss"
-              />
+              <div className="flex flex-wrap items-start gap-2">
+                {review.orphan?.uid && (
+                  <ManualResolutionDialog
+                    reviewId={review.id}
+                    uid={review.orphan.uid}
+                    authority={review.authority}
+                    addressKey={review.address_key}
+                    reference={review.orphan.reference}
+                    description={review.orphan.description}
+                  />
+                )}
+                <GroupingResolutionButton
+                  reviewId={review.id}
+                  resolution="dismiss"
+                  label="Dismiss"
+                />
+              </div>
             </article>
           ))}
         </div>

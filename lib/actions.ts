@@ -2,7 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import type { Practice, PracticeContact } from "@/lib/types";
+import type {
+  ManualResolveOutcome,
+  Practice,
+  PracticeContact,
+  SchemeCandidate,
+} from "@/lib/types";
+import { getSameAddressSchemes, getSamePostcodeSchemes } from "@/lib/queries";
+import { normaliseManualRef, validateManualRef } from "@/lib/manual-ref";
 
 type Result<T = undefined> =
   | (T extends undefined ? { ok: true } : { ok: true; data: T })
@@ -108,6 +115,106 @@ export async function applyGroupingResolution(
       ? String((data as { action: unknown }).action)
       : null;
   return { ok: true, action };
+}
+
+function refreshGroupingViews() {
+  revalidatePath("/");
+  revalidatePath("/lead");
+}
+
+export async function resolveReviewWithRef(
+  reviewId: number,
+  reference: string
+): Promise<
+  | { ok: true; outcome: ManualResolveOutcome }
+  | { ok: false; error: string }
+> {
+  if (!Number.isSafeInteger(reviewId) || reviewId < 1) {
+    return { ok: false, error: "Invalid grouping review." };
+  }
+  const ref = normaliseManualRef(reference);
+  const invalid = validateManualRef(ref);
+  if (invalid) return { ok: false, error: invalid };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("resolve_review_with_ref", {
+    p_review_id: reviewId,
+    p_reference: ref,
+  });
+  if (error) return { ok: false, error: error.message };
+
+  const payload = (data ?? {}) as {
+    action?: string;
+    project_id?: number | string | null;
+    reference?: string | null;
+  };
+  refreshGroupingViews();
+  const reference_ = payload.reference ?? ref;
+  switch (payload.action) {
+    case "linked":
+      return {
+        ok: true,
+        outcome: {
+          action: "linked",
+          project_id:
+            payload.project_id != null ? Number(payload.project_id) : null,
+          reference: reference_,
+        },
+      };
+    case "queued_for_hunt":
+      return {
+        ok: true,
+        outcome: { action: "queued_for_hunt", reference: reference_ },
+      };
+    case "exhausted":
+      return {
+        ok: true,
+        outcome: { action: "exhausted", reference: reference_ },
+      };
+    default:
+      return { ok: false, error: "Unexpected response from the server." };
+  }
+}
+
+export async function resolveReviewSingleton(
+  reviewId: number
+): Promise<{ ok: true; projectId: number | null } | { ok: false; error: string }> {
+  if (!Number.isSafeInteger(reviewId) || reviewId < 1) {
+    return { ok: false, error: "Invalid grouping review." };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("resolve_review_singleton", {
+    p_review_id: reviewId,
+  });
+  if (error) return { ok: false, error: error.message };
+  refreshGroupingViews();
+  const projectId =
+    data && typeof data === "object" && "project_id" in data
+      ? Number((data as { project_id: unknown }).project_id)
+      : null;
+  return { ok: true, projectId: Number.isFinite(projectId) ? projectId : null };
+}
+
+export async function getSameAddressSchemesAction(
+  authority: string,
+  addressKey: string | null
+): Promise<Result<SchemeCandidate[]>> {
+  try {
+    return { ok: true, data: await getSameAddressSchemes(authority, addressKey) };
+  } catch (e) {
+    return fail(e, "Could not load schemes.");
+  }
+}
+
+export async function getSamePostcodeSchemesAction(
+  uid: string,
+  page: number
+): Promise<Result<{ schemes: SchemeCandidate[]; hasMore: boolean }>> {
+  try {
+    return { ok: true, data: await getSamePostcodeSchemes(uid, page) };
+  } catch (e) {
+    return fail(e, "Could not load schemes.");
+  }
 }
 
 // ---------------------------------------------------------------------------

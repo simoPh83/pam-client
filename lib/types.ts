@@ -108,6 +108,22 @@ export type UnlinkedNoSchemeRow = {
   created_at: string;
 };
 
+/** A scheme (project) offered as an assign target in manual resolution. */
+export type SchemeCandidate = {
+  project_id: number;
+  address: string | null;
+  description: string | null;
+  app_type: string | null;
+  start_date: string | null;
+  decided_date: string | null;
+  n_applications: number;
+};
+
+export type ManualResolveOutcome =
+  | { action: "linked"; project_id: number | null; reference: string | null }
+  | { action: "queued_for_hunt"; reference: string | null }
+  | { action: "exhausted"; reference: string | null };
+
 export type ApplicationFull = Lead & {
   start_date: string | null;
   in_leads_sheet: boolean;

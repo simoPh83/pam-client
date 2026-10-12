@@ -13,6 +13,7 @@ import type {
   ProjectGroupingReview,
   ProjectMeta,
   ProjectPractice,
+  SchemeCandidate,
   StateHistoryRow,
   UnlinkedNoSchemeRow,
 } from "@/lib/types";
@@ -359,6 +360,121 @@ export async function getUnlinkedNoSchemeReviews(
     }),
     total: count ?? 0,
   };
+}
+
+/** Enrich project ids into scheme cards (root/latest application details). */
+async function buildSchemeCandidates(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  projectIds: number[]
+): Promise<SchemeCandidate[]> {
+  if (!projectIds.length) return [];
+  const { data: projects, error } = await supabase
+    .from("projects")
+    .select("id, root_uid, latest_uid, n_applications")
+    .in("id", projectIds);
+  if (error) throw error;
+
+  const uids = [
+    ...new Set(
+      (projects ?? []).flatMap((p) =>
+        [p.root_uid, p.latest_uid].filter((u): u is string => Boolean(u))
+      )
+    ),
+  ];
+  const { data: apps, error: appsError } = uids.length
+    ? await supabase
+        .from("applications")
+        .select("uid, address, description, app_type, start_date, decided_date")
+        .in("uid", uids)
+    : { data: [], error: null };
+  if (appsError) throw appsError;
+  const appByUid = new Map((apps ?? []).map((a) => [a.uid, a]));
+
+  return (projects ?? []).map((p) => {
+    const root = p.root_uid ? appByUid.get(p.root_uid) : undefined;
+    const latest = p.latest_uid ? appByUid.get(p.latest_uid) : undefined;
+    return {
+      project_id: p.id as number,
+      address: ((root ?? latest)?.address as string | null) ?? null,
+      description:
+        ((latest ?? root)?.description as string | null) ?? null,
+      app_type: (root?.app_type as string | null) ?? null,
+      start_date: (root?.start_date as string | null) ?? null,
+      decided_date: (latest?.decided_date as string | null) ?? null,
+      n_applications: (p.n_applications as number | null) ?? 0,
+    };
+  });
+}
+
+/** Schemes at the same (authority, address_key) as a review row. */
+export async function getSameAddressSchemes(
+  authority: string,
+  addressKey: string | null
+): Promise<SchemeCandidate[]> {
+  if (!addressKey) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("authority", authority)
+    .eq("address_key", addressKey)
+    .limit(100);
+  if (error) throw error;
+  return buildSchemeCandidates(
+    supabase,
+    (data ?? []).map((p) => p.id as number)
+  );
+}
+
+export const POSTCODE_PAGE_SIZE = 50;
+
+/**
+ * Schemes whose applications share the postcode of `uid`. Paginates over
+ * applications and groups them by project, so a page may yield fewer
+ * schemes than POSTCODE_PAGE_SIZE.
+ */
+export async function getSamePostcodeSchemes(
+  uid: string,
+  page = 1
+): Promise<{ schemes: SchemeCandidate[]; hasMore: boolean }> {
+  const supabase = await createClient();
+  const { data: self, error: selfError } = await supabase
+    .from("applications")
+    .select("postcode")
+    .eq("uid", uid)
+    .maybeSingle();
+  if (selfError) throw selfError;
+  const compact = String(self?.postcode ?? "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+  if (compact.length < 5) return { schemes: [], hasMore: false };
+
+  // Postcodes are stored with or without the space; match both forms.
+  const pattern = `${compact.slice(0, -3)}%${compact.slice(-3)}`;
+  const from = (Math.max(1, page) - 1) * POSTCODE_PAGE_SIZE;
+  const { data: apps, error } = await supabase
+    .from("applications")
+    .select("uid")
+    .ilike("postcode", pattern)
+    .neq("uid", uid)
+    .order("uid", { ascending: true })
+    .range(from, from + POSTCODE_PAGE_SIZE);
+  if (error) throw error;
+
+  const rows = apps ?? [];
+  const hasMore = rows.length > POSTCODE_PAGE_SIZE;
+  const uids = rows.slice(0, POSTCODE_PAGE_SIZE).map((a) => a.uid as string);
+  if (!uids.length) return { schemes: [], hasMore };
+
+  const { data: membership, error: memberError } = await supabase
+    .from("project_applications")
+    .select("project_id")
+    .in("uid", uids);
+  if (memberError) throw memberError;
+  const projectIds = [
+    ...new Set((membership ?? []).map((m) => m.project_id as number)),
+  ];
+  return { schemes: await buildSchemeCandidates(supabase, projectIds), hasMore };
 }
 
 export async function getProjectBundle(projectId: number | string): Promise<{

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { UnlinkedNoSchemeRow } from "@/lib/types";
 import { GroupingResolutionButton } from "@/components/grouping-resolution-button";
+import { ManualResolutionDialog } from "@/components/manual-resolution-dialog";
 import { Pagination } from "@/components/pagination";
 
 export function UnlinkedNoSchemeList({
@@ -69,11 +70,21 @@ export function UnlinkedNoSchemeList({
                 No linked scheme — parent not yet in our data.
               </p>
             </div>
-            <GroupingResolutionButton
-              reviewId={row.id}
-              resolution="dismiss"
-              label="Dismiss"
-            />
+            <div className="flex flex-col items-end gap-2">
+              <ManualResolutionDialog
+                reviewId={row.id}
+                uid={row.uid}
+                authority={row.authority}
+                addressKey={row.address_key}
+                reference={row.reference}
+                description={row.description}
+              />
+              <GroupingResolutionButton
+                reviewId={row.id}
+                resolution="dismiss"
+                label="Dismiss"
+              />
+            </div>
           </li>
         ))}
       </ul>
