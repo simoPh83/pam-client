@@ -230,15 +230,6 @@ export function ProjectsTable({
               {row.original.authority}
             </span>
           </span>
-          {row.original.n_applications > 1 && (
-            <Badge
-              variant="secondary"
-              className="size-5 shrink-0 justify-center rounded-full p-0 text-[10px]"
-              title={`${row.original.n_applications} applications in this scheme`}
-            >
-              {row.original.n_applications}
-            </Badge>
-          )}
           {row.original.grouping_state === "ambiguous" && (
             <Badge
               variant="outline"
@@ -266,6 +257,23 @@ export function ProjectsTable({
       ),
     },
     {
+      id: "docs",
+      header: () => <span title="Applications in this scheme">Docs</span>,
+      size: 46,
+      cell: ({ row }) =>
+        row.original.n_applications > 1 ? (
+          <span className="flex justify-center">
+            <Badge
+              variant="secondary"
+              className="size-5 justify-center rounded-full p-0 text-[10px]"
+              title={`${row.original.n_applications} applications in this scheme`}
+            >
+              {row.original.n_applications}
+            </Badge>
+          </span>
+        ) : null,
+    },
+    {
       accessorKey: "root_reference",
       header: "Root ref",
       size: 110,
@@ -285,12 +293,10 @@ export function ProjectsTable({
     {
       accessorKey: "root_description",
       header: "Description",
-      // no size → takes the remaining flexible width
+      size: 380,
+      // Full text, wrapping — rows vary in height by design.
       cell: ({ getValue }) => (
-        <span
-          className="block truncate text-muted-foreground"
-          title={getValue<string>() ?? ""}
-        >
+        <span className="block text-sm text-muted-foreground">
           {getValue<string>() ?? "—"}
         </span>
       ),
@@ -324,20 +330,29 @@ export function ProjectsTable({
       header: () => (
         <SortableHead label="Last update" col="last_updated" filters={filters} />
       ),
-      size: 210,
-      cell: ({ row }) => (
-        <span className="block text-xs">
-          <span className="font-mono">{formatDate(row.original.last_updated)}</span>
-          {row.original.latest_reference && (
-            <span className="mt-0.5 flex items-center gap-1 text-muted-foreground">
-              <span className="truncate" title={roleLabel(row.original.latest_role)}>
-                {roleLabel(row.original.latest_role)}
-              </span>
-              <StateBadge state={row.original.latest_state} />
-            </span>
-          )}
-        </span>
+      size: 90,
+      cell: ({ getValue }) => (
+        <span className="font-mono text-xs">{formatDate(getValue<string>())}</span>
       ),
+    },
+    {
+      id: "latest_activity",
+      header: "Latest activity",
+      size: 130,
+      cell: ({ row }) =>
+        row.original.latest_reference ? (
+          <span className="flex flex-col items-start gap-0.5">
+            <span
+              className="text-xs text-muted-foreground"
+              title={roleLabel(row.original.latest_role)}
+            >
+              {roleLabel(row.original.latest_role)}
+            </span>
+            <StateBadge state={row.original.latest_state} />
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
     },
   ];
 

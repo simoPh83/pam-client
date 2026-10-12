@@ -82,9 +82,10 @@ export function ProjectGroupingReview({
 
   // While the worker processes a split, refresh periodically — the review row
   // flips to resolved and the banner disappears once the split completes.
+  // The worker runs one job at a time, so a split can sit queued for a while.
   useEffect(() => {
     if (!splitInFlight) return;
-    const timer = setInterval(() => router.refresh(), 15000);
+    const timer = setInterval(() => router.refresh(), 60000);
     return () => clearInterval(timer);
   }, [splitInFlight, router]);
 
@@ -139,8 +140,9 @@ export function ProjectGroupingReview({
               </div>
               {splitInFlight ? (
                 <p className="text-xs text-muted-foreground">
-                  Split requested — the worker will separate these schemes
-                  shortly. This page updates automatically.
+                  {splitRequest?.status === "running"
+                    ? "Split in progress — separating these schemes now. This page checks for updates every minute."
+                    : "Split queued — This page checks for updates every minute, but it might take up to an hour to complete."}
                 </p>
               ) : (
                 <div className="flex flex-wrap items-start justify-between gap-3">

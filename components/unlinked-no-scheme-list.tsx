@@ -41,9 +41,9 @@ export function UnlinkedNoSchemeList({
         {rows.map((row) => (
           <li
             key={row.id}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-zinc-200 bg-white/70 px-3 py-2 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300"
+            className="flex items-stretch justify-between gap-3 rounded-md border border-zinc-200 bg-white/70 px-3 py-2 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300"
           >
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                 <Link
                   href={`/lead?uid=${encodeURIComponent(row.uid)}`}
@@ -62,7 +62,7 @@ export function UnlinkedNoSchemeList({
                 </p>
               )}
               {row.description && (
-                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
                   {row.description}
                 </p>
               )}
@@ -70,7 +70,7 @@ export function UnlinkedNoSchemeList({
                 No linked scheme — parent not yet in our data.
               </p>
             </div>
-            <div className="flex flex-col items-end gap-2">
+            <div className="flex shrink-0 flex-col items-end justify-between gap-2">
               <ManualResolutionDialog
                 reviewId={row.id}
                 uid={row.uid}
