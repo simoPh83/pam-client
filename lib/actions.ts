@@ -74,13 +74,14 @@ export async function toggleProjectStar(projectId: number, starred: boolean) {
 export async function applyGroupingResolution(
   reviewId: number,
   resolution: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; action: string | null } | { ok: false; error: string }> {
   if (!Number.isSafeInteger(reviewId) || reviewId < 1) {
     return { ok: false, error: "Invalid grouping review." };
   }
   if (
     resolution !== "merged" &&
     resolution !== "dismiss" &&
+    resolution !== "split" &&
     !/^[1-9]\d*$/.test(resolution)
   ) {
     return { ok: false, error: "Invalid grouping resolution." };
@@ -94,7 +95,7 @@ export async function applyGroupingResolution(
   if (authError) return { ok: false, error: authError.message };
   if (!user) return { ok: false, error: "Not signed in." };
 
-  const { error } = await supabase.rpc("apply_grouping_resolution", {
+  const { data, error } = await supabase.rpc("apply_grouping_resolution", {
     p_review_id: reviewId,
     p_resolution: resolution,
   });
@@ -102,11 +103,15 @@ export async function applyGroupingResolution(
 
   revalidatePath("/");
   revalidatePath("/lead");
-  return { ok: true };
+  const action =
+    data && typeof data === "object" && "action" in data
+      ? String((data as { action: unknown }).action)
+      : null;
+  return { ok: true, action };
 }
 
 // ---------------------------------------------------------------------------
-// Practices (shared register — see docs/2026.10.08-practices-integration-brief.md)
+// Practices (shared register — see docs/2026-10-08-practices-integration-brief.md)
 // These actions return result objects instead of throwing so the UI can show
 // validation/duplicate errors explicitly.
 // ---------------------------------------------------------------------------

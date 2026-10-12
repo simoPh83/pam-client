@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import type { GroupingReviewCandidate, Project, ProjectGroupingReview } from "@/lib/types";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { GroupingReviewCandidate, Project, ProjectGroupingReview, SplitRequest } from "@/lib/types";
 import { formatDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { GroupingResolutionButton } from "@/components/grouping-resolution-button";
+import { SplitSchemeButton } from "@/components/split-scheme-button";
 
 function CandidateDetails({
   candidate,
@@ -56,18 +59,33 @@ function CandidateDetails({
 export function ProjectGroupingReview({
   project,
   reviews,
-  derivedCandidates = [],
+  splitRequest,
 }: {
   project: Project;
   reviews: ProjectGroupingReview[];
-  derivedCandidates?: GroupingReviewCandidate[];
+  splitRequest?: SplitRequest | null;
 }) {
+  const router = useRouter();
+  const [splitQueued, setSplitQueued] = useState(false);
   const multiRootReviews = reviews.filter(
     (review) => review.reason === "multi_root"
   );
   const unlinkedReviews = reviews.filter(
     (review) => review.reason === "unlinked_multi_scheme"
   );
+
+  const splitInFlight =
+    splitQueued ||
+    splitRequest?.status === "pending" ||
+    splitRequest?.status === "running";
+
+  // While the worker processes a split, refresh periodically — the review row
+  // flips to resolved and the banner disappears once the split completes.
+  useEffect(() => {
+    if (!splitInFlight) return;
+    const timer = setInterval(() => router.refresh(), 15000);
+    return () => clearInterval(timer);
+  }, [splitInFlight, router]);
 
   if (
     project.grouping_state === "clean" &&
@@ -118,60 +136,38 @@ export function ProjectGroupingReview({
                   />
                 ))}
               </div>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <GroupingResolutionButton
-                  reviewId={review.id}
-                  resolution="merged"
-                  label="Keep as one scheme"
-                  variant="secondary"
-                />
-                <p className="max-w-xl text-xs text-muted-foreground">
-                  Splitting these roots requires worker-side handling and is
-                  not available through the current review action.
+              {splitInFlight ? (
+                <p className="text-xs text-muted-foreground">
+                  Split requested — the worker will separate these schemes
+                  shortly. This page updates automatically.
                 </p>
-              </div>
+              ) : (
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex flex-wrap items-start gap-2">
+                    <GroupingResolutionButton
+                      reviewId={review.id}
+                      resolution="merged"
+                      label="Keep as one scheme"
+                      variant="secondary"
+                    />
+                    <SplitSchemeButton
+                      reviewId={review.id}
+                      candidateCount={review.candidates.length}
+                      onQueued={() => setSplitQueued(true)}
+                    />
+                  </div>
+                  {splitRequest?.status === "failed" && (
+                    <p className="max-w-xl text-xs text-destructive">
+                      The last split request failed
+                      {splitRequest.error ? `: ${splitRequest.error}` : ""}.
+                      You can retry — repeat requests are safe.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           ))
-        ) : derivedCandidates.length ? (
-          <div className="space-y-3 rounded-md border border-amber-400/70 bg-amber-50/60 p-4 dark:bg-amber-950/20">
-            <div>
-              <Badge className="border-amber-500 bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100">
-                Multiple schemes
-              </Badge>
-              <p className="mt-2 text-sm font-medium">
-                This address contains {derivedCandidates.length} candidate
-                schemes.
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                These roots are currently kept together as one project. Most
-                multi-root groups are one evolving scheme and can be left as
-                they are.
-              </p>
-            </div>
-            <div className="grid gap-2 md:grid-cols-2">
-              {derivedCandidates.map((candidate, index) => (
-                <CandidateDetails
-                  key={`${candidate.project_id}-${candidate.uid ?? index}`}
-                  candidate={candidate}
-                />
-              ))}
-            </div>
-            <p className="max-w-xl text-xs text-muted-foreground">
-              Grouping actions for this project become available once the
-              worker syncs a review for it.
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-md border border-amber-400/70 bg-amber-50/60 px-4 py-3 dark:bg-amber-950/20">
-            <Badge className="border-amber-500 bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100">
-              Multiple schemes
-            </Badge>
-            <p className="mt-2 text-sm">
-              This address contains multiple candidate schemes. Review details
-              are not currently available.
-            </p>
-          </div>
-        ))}
+        ) : null)}
 
       {unlinkedReviews.length > 0 && (
         <div className="space-y-3 rounded-md border border-sky-300/70 bg-sky-50/50 p-4 dark:bg-sky-950/15">

@@ -90,6 +90,12 @@ export type ProjectGroupingReview = GroupingReview & {
   } | null;
 };
 
+/** In-flight worker split of a multi-root project (see split_requests). */
+export type SplitRequest = {
+  status: "pending" | "running" | "done" | "failed";
+  error: string | null;
+};
+
 export type UnlinkedNoSchemeRow = {
   id: number;
   uid: string;

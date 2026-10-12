@@ -96,7 +96,7 @@ search ~1.4s. Further gains need worker-side denormalisation (see below).
    root application, so sorting forces a full join of ~160k projects â†’
    applications (~35s, times out). Proper fix is worker-side: add a
    denormalised `projects.filed_date` column (the backend spec
-   `2026.10.05-backend-spec-new-features.md` Â§3 already anticipates this).
+   `2026-10-05-backend-spec-new-features.md` Â§3 already anticipates this).
    Then expose it in `projects_feed` and re-enable the sortable header in
    `projects-table.tsx`.
 2. **Search covers project name/address only.** Matching
@@ -129,7 +129,7 @@ path in production â€” see "Performance debugging" above for final numbers.
 
 # Session log â€” 2026-10-08
 
-Practices integration (spec: docs/2026.10.08-practices-integration-brief.md,
+Practices integration (spec: docs/2026-10-08-practices-integration-brief.md,
 updated this session with the agent-promotion addition).
 
 Decisions made together:
@@ -282,12 +282,12 @@ rolled-back transaction.
 `-negation` are native websearch syntax. English stemming applies
 (erection â†” erections). Placeholder: `e.g. house OR villa -garden`.
 
-# Session log — 2026-10-12
+# Session log ï¿½ 2026-10-12
 
 Multi-root split groundwork (ambiguous projects).
 
 - Measured live: 940 ambiguous projects, only 208 with a pending
-  `multi_root` review — the other ~740 render "Review details are not
+  `multi_root` review ï¿½ the other ~740 render "Review details are not
   currently available". Root cause: the pam worker never writes review rows
   incrementally (only the 2026-10-10 migration did), and split is not
   implemented anywhere (the RPC raises on it).
@@ -301,10 +301,35 @@ Multi-root split groundwork (ambiguous projects).
   (`has_parent_refs = false`) and renders the full banner instead of the
   "not available" message. Covers 551 of the 742 gap projects; the
   remaining 191 are zero-root components (all members have resolved parent
-  refs — cycles / missing parents), which keep the old message by design.
+  refs ï¿½ cycles / missing parents), which keep the old message by design.
 - Investigated the `unlinked_no_scheme` queue (742 rows, down from 2,094):
-  ~80% clearly secondary, 134 typed Full/Outline — mostly s73/reserved-
+  ~80% clearly secondary, 134 typed Full/Outline ï¿½ mostly s73/reserved-
   matters records, plus a genuine minority of standalone mains that should
   be standalone projects. Wrote `docs/2026-10-12-no-scheme-queue-notes.md`
   for pam: promote original-classified no-ref apps to standalone projects +
   extend the ref parser with `Ref:`/`RN` prefixes.
+- Backend shipped the split work (pam repo) and provided
+  `docs/2026-10-12-split-wiring-frontend.md`. Verified live: `split_requests`
+  table exists, RPC accepts 'split' (returns split_queued), pending
+  multi_root reviews backfilled (935; 1 ambiguous straggler the worker will
+  pick up on its next regroup).
+- Frontend wiring: "Split into separate schemes" button with confirm dialog
+  on the multi-root banner; RPC action surfaced to the client; in-flight
+  state read from `split_requests` with 15s auto-refresh while
+  pending/running; failed state shows the error and allows retry.
+- Removed the stopgap candidate derivation (`getAmbiguousRootCandidates`)
+  and the "review details not currently available" fallback, per the
+  wiring doc's cleanup section. Address enrichment of review candidates
+  stays (backend candidates carry no address).
+- Bug found after testing a merge: clicking a merged application's tab
+  rendered it standalone. Root cause is backend data, not the merge:
+  `Croydon/26/01368/FUL` has TWO `project_applications` rows (88733, the
+  real 4-member scheme; and 650582, a singleton created by the 2026-10-10
+  migration). `maybeSingle()` on the membership lookup errors on duplicates
+  and the code silently fell back to "no project". Scale: 2,249 uids have
+  dual membership, none created by today's deploy — the worker's group()
+  adds reference-resolved memberships without rehoming the uid from its old
+  project. Wrote `docs/2026-10-12-backend-issue-dual-membership.md` for pam
+  (repair script + unique index on project_applications(uid) + group()
+  fix). Frontend mitigation shipped: pick the richest project (most
+  members, tie ? lowest id) instead of maybeSingle.

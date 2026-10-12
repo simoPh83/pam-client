@@ -42,7 +42,7 @@ Backend issue found during analysis (roots that are discharges): [backend-issue-
 Earlier reasoning on discharges/lanes: [web-client-kickoff/2026.09.29-next-steps-roadmap.md](../../web-client-kickoff/2026.09.29-next-steps-roadmap.md).
 Backend repo docs (public): <https://github.com/simoPh83/pam/tree/main/docs>. The most relevant is
 `completion-estimation-framework.md` (priors imported into [algorithm.md](algorithm.md)), plus its
-three `...Reaction_*` files, `2026.10.01-planit-update-logic.md` and `2026.09.27-planit-api-findings.md`.
+three `...Reaction_*` files, `2026-10-01-planit-update-logic.md` and `2026-09-27-planit-api-findings.md`.
 
 ## Candidate signals
 

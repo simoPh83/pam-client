@@ -5,7 +5,7 @@
 -- are SHARED between all signed-in users — no ownership hierarchy.
 -- `created_by`/`created_by_email` are recorded for attribution only.
 --
--- Docs: docs/2026.10.08-practices-integration-brief.md
+-- Docs: docs/2026-10-08-practices-integration-brief.md
 
 -- Shared practice records.
 create table if not exists public.ui_practices (

@@ -17,7 +17,7 @@ import type {
   UnlinkedNoSchemeRow,
 } from "@/lib/types";
 import { PAGE_SIZE, type ProjectFilters } from "@/lib/project-filters";
-import type { GroupingState, Project, ProjectMembership } from "@/lib/types";
+import type { GroupingState, Project, ProjectMembership, SplitRequest } from "@/lib/types";
 
 export { PAGE_SIZE } from "@/lib/project-filters";
 
@@ -296,40 +296,20 @@ export async function getProjectGroupingReviews(
 }
 
 /**
- * Candidate roots of an ambiguous project, derived live from memberships.
- * Stopgap for ambiguous projects whose `multi_root` review row hasn't been
- * written by the worker yet (see docs/2026-10-12-multi-root-split-backend-spec.md).
+ * In-flight split request for a project, if any. The worker picks these up
+ * within ~1 min when idle (see docs/2026-10-12-split-wiring-frontend.md).
  */
-export async function getAmbiguousRootCandidates(
-  project: Project
-): Promise<GroupingReviewCandidate[]> {
+export async function getSplitRequest(
+  projectId: number
+): Promise<SplitRequest | null> {
   const supabase = await createClient();
-  const { data: members, error } = await supabase
-    .from("project_applications")
-    .select("uid")
-    .eq("project_id", project.id)
-    .eq("has_parent_refs", false);
+  const { data, error } = await supabase
+    .from("split_requests")
+    .select("status, error")
+    .eq("project_id", projectId)
+    .maybeSingle();
   if (error) throw error;
-  const uids = (members ?? []).map((member) => member.uid as string);
-  if (!uids.length) return [];
-
-  const { data: apps, error: appsError } = await supabase
-    .from("applications")
-    .select("uid, description, app_type, start_date, address")
-    .in("uid", uids)
-    .order("start_date", { ascending: true });
-  if (appsError) throw appsError;
-
-  return (apps ?? []).map((app) => ({
-    project_id: project.id,
-    uid: app.uid as string,
-    address: (app.address as string | null) ?? null,
-    description: (app.description as string | null) ?? null,
-    app_type: (app.app_type as string | null) ?? null,
-    start_date: (app.start_date as string | null) ?? null,
-    grouping_state: null,
-    n_applications: null,
-  }));
+  return (data as SplitRequest | null) ?? null;
 }
 
 /** Page of parentless applications that currently have no scheme to join. */
@@ -606,7 +586,15 @@ export async function getLeadDetail(uid: string): Promise<{
       .eq("uid", uid)
       .order("contacted_at", { ascending: false }),
     supabase.from("leads").select("project_id, n_applications").eq("uid", uid).maybeSingle(),
-    supabase.from("project_applications").select("project_id").eq("uid", uid).maybeSingle(),
+    // project_applications should hold exactly one row per uid, but dual
+    // memberships exist until the backend repairs the invariant (see
+    // docs/2026-10-12-backend-issue-dual-membership.md). maybeSingle() would
+    // error on duplicates, so fetch a few and pick the richest project.
+    supabase
+      .from("project_applications")
+      .select("project_id, projects(n_applications)")
+      .eq("uid", uid)
+      .limit(5),
   ]);
 
   if (appRes.error) throw appRes.error;
@@ -614,12 +602,25 @@ export async function getLeadDetail(uid: string): Promise<{
     return { app: null, history: [], outreach: [], meta: null, otherByAgent: [] };
   }
 
+  const memberships = (memberRes.data ?? []) as {
+    project_id: number;
+    // PostgREST may type the to-one embed as an array; handle both shapes.
+    projects: { n_applications: number }[] | { n_applications: number } | null;
+  }[];
+  const memberCount = (m: (typeof memberships)[number]): number => {
+    const p = Array.isArray(m.projects) ? m.projects[0] : m.projects;
+    return p?.n_applications ?? 0;
+  };
+  const bestMembership = [...memberships].sort(
+    (a, b) => memberCount(b) - memberCount(a) || a.project_id - b.project_id
+  )[0];
+
   const app = {
     ...(appRes.data as Record<string, unknown>),
     ...(fullRes.data ?? {}),
     // applications has no project_id. Prefer project_applications (covers all
     // members incl. non-leads); fall back to the leads view for leads.
-    project_id: memberRes.data?.project_id ?? leadRes.data?.project_id ?? null,
+    project_id: bestMembership?.project_id ?? leadRes.data?.project_id ?? null,
     n_applications: leadRes.data?.n_applications ?? null,
   } as ApplicationFull;
 

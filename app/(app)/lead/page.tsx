@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  getAmbiguousRootCandidates,
   getLeadDetail,
   getProjectAgents,
   getProjectBundle,
   getProjectGroupingReviews,
   getProjectPractices,
+  getSplitRequest,
 } from "@/lib/queries";
 import { formatDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
@@ -59,14 +59,11 @@ export default async function LeadDetailPage({
         ])
       : [[], [], []];
 
-  // Ambiguous projects whose multi_root review row hasn't been written by the
-  // worker yet still get candidate details, derived live from memberships.
-  const derivedCandidates =
-    project &&
-    project.grouping_state === "ambiguous" &&
-    !groupingReviews.some((review) => review.reason === "multi_root")
-      ? await getAmbiguousRootCandidates(project)
-      : [];
+  // In-flight worker split, if the user requested one for this project.
+  const splitRequest =
+    project && groupingReviews.some((review) => review.reason === "multi_root")
+      ? await getSplitRequest(project.id)
+      : null;
 
   const links = [
     { label: "Council page", url: app.council_url },
@@ -94,7 +91,7 @@ export default async function LeadDetailPage({
         <ProjectGroupingReview
           project={project}
           reviews={groupingReviews}
-          derivedCandidates={derivedCandidates}
+          splitRequest={splitRequest}
         />
       )}
       {projectId != null && (

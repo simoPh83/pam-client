@@ -30,8 +30,8 @@ Next:
   and their description patterns from our data, and compare with the council's `application_type`.
 - Reserved matters and prior approval: do they appear as distinct `app_type` values, or hide inside "Full"/"Outline"?
 
-- Not yet read from the backend repo: Gemini reaction (27 KB), `2026.10.01-planit-update-logic.md`,
-  `2026.10.05-backend-spec-new-features.md`, `audit-progress.md`, `user-log`.
+- Not yet read from the backend repo: Gemini reaction (27 KB), `2026-10-01-planit-update-logic.md`,
+  `2026-10-05-backend-spec-new-features.md`, `audit-progress.md`, `user-log`.
 - Do the framework's priors (see [algorithm.md](algorithm.md) P1–P8) hold on the full dataset?
   In particular: is `app_type='Conditions'` really a discharge, and does `application_type`
   (council's own string) classify better than `app_type`?

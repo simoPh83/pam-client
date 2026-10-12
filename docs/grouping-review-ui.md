@@ -28,12 +28,15 @@ to `grouping_review` directly.
 - Assign an unlinked application to a candidate scheme using that
   `project_id`.
 - Keep a `multi_root` group as one scheme using `merged`.
+- Split a `multi_root` group into separate schemes using `split`.
 - Dismiss an orphan using `dismiss`.
 
-**Splitting a `multi_root` project is not supported by this RPC yet.** It is
-a worker-side operation; the UI explains the limitation and must not submit a
-`split` resolution to `apply_grouping_resolution`. The backend work (worker
-maintaining review rows + queued split jobs) is specified in
-[`2026-10-12-multi-root-split-backend-spec.md`](./2026-10-12-multi-root-split-backend-spec.md);
-once it ships, this section changes: `split` becomes a valid resolution and
-every ambiguous project is guaranteed a candidate list.
+**Split is asynchronous** (backend deployed 2026-10-12): the RPC returns
+`{action: 'split_queued'}` and leaves the review row pending; the worker
+performs the split (usually within a minute) and only then marks the review
+`resolved`/`split`. In-flight state is read from `split_requests`
+(`pending`/`running`/`failed`); repeat clicks are idempotent. See
+[`2026-10-12-split-wiring-frontend.md`](./2026-10-12-split-wiring-frontend.md)
+for the wiring contract and
+[`2026-10-12-multi-root-split-backend-spec.md`](./2026-10-12-multi-root-split-backend-spec.md)
+for the backend spec.
