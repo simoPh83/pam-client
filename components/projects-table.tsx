@@ -257,8 +257,8 @@ export function ProjectsTable({
       ),
     },
     {
-      id: "docs",
-      header: () => <span title="Applications in this scheme">Docs</span>,
+      id: "apps",
+      header: () => <span title="Applications in this scheme">Apps</span>,
       size: 46,
       cell: ({ row }) =>
         row.original.n_applications > 1 ? (
