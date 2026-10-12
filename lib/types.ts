@@ -59,6 +59,7 @@ export type GroupingReviewReason =
 export type GroupingReviewCandidate = {
   project_id: number;
   uid: string | null;
+  address: string | null;
   description: string | null;
   app_type: string | null;
   start_date: string | null;

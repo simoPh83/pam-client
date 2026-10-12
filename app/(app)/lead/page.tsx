@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
+  getAmbiguousRootCandidates,
   getLeadDetail,
   getProjectAgents,
   getProjectBundle,
@@ -58,6 +59,15 @@ export default async function LeadDetailPage({
         ])
       : [[], [], []];
 
+  // Ambiguous projects whose multi_root review row hasn't been written by the
+  // worker yet still get candidate details, derived live from memberships.
+  const derivedCandidates =
+    project &&
+    project.grouping_state === "ambiguous" &&
+    !groupingReviews.some((review) => review.reason === "multi_root")
+      ? await getAmbiguousRootCandidates(project)
+      : [];
+
   const links = [
     { label: "Council page", url: app.council_url },
     { label: "Documents", url: app.docs_url },
@@ -81,7 +91,11 @@ export default async function LeadDetailPage({
         projectName={project?.name ?? null}
       />
       {project && (
-        <ProjectGroupingReview project={project} reviews={groupingReviews} />
+        <ProjectGroupingReview
+          project={project}
+          reviews={groupingReviews}
+          derivedCandidates={derivedCandidates}
+        />
       )}
       {projectId != null && (
         <div className="grid gap-4 lg:grid-cols-2">

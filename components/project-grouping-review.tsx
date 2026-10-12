@@ -33,6 +33,11 @@ function CandidateDetails({
           <Badge variant="secondary">{candidate.grouping_state}</Badge>
         )}
       </div>
+      {candidate.address && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {candidate.address}
+        </p>
+      )}
       {candidate.description && (
         <p className="mt-1 text-sm text-muted-foreground">
           {candidate.description}
@@ -51,9 +56,11 @@ function CandidateDetails({
 export function ProjectGroupingReview({
   project,
   reviews,
+  derivedCandidates = [],
 }: {
   project: Project;
   reviews: ProjectGroupingReview[];
+  derivedCandidates?: GroupingReviewCandidate[];
 }) {
   const multiRootReviews = reviews.filter(
     (review) => review.reason === "multi_root"
@@ -125,6 +132,35 @@ export function ProjectGroupingReview({
               </div>
             </div>
           ))
+        ) : derivedCandidates.length ? (
+          <div className="space-y-3 rounded-md border border-amber-400/70 bg-amber-50/60 p-4 dark:bg-amber-950/20">
+            <div>
+              <Badge className="border-amber-500 bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100">
+                Multiple schemes
+              </Badge>
+              <p className="mt-2 text-sm font-medium">
+                This address contains {derivedCandidates.length} candidate
+                schemes.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                These roots are currently kept together as one project. Most
+                multi-root groups are one evolving scheme and can be left as
+                they are.
+              </p>
+            </div>
+            <div className="grid gap-2 md:grid-cols-2">
+              {derivedCandidates.map((candidate, index) => (
+                <CandidateDetails
+                  key={`${candidate.project_id}-${candidate.uid ?? index}`}
+                  candidate={candidate}
+                />
+              ))}
+            </div>
+            <p className="max-w-xl text-xs text-muted-foreground">
+              Grouping actions for this project become available once the
+              worker syncs a review for it.
+            </p>
+          </div>
         ) : (
           <div className="rounded-md border border-amber-400/70 bg-amber-50/60 px-4 py-3 dark:bg-amber-950/20">
             <Badge className="border-amber-500 bg-amber-100 text-amber-900 dark:bg-amber-900/50 dark:text-amber-100">

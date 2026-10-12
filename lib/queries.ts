@@ -252,12 +252,20 @@ export async function getProjectGroupingReviews(
         .filter((uid): uid is string => Boolean(uid))
     ),
   ];
+  // Candidate payloads from grouping_review don't carry addresses; enrich
+  // from applications so cards can show where each candidate sits.
+  const candidateUids = reviews.flatMap((review) =>
+    (review.candidates ?? [])
+      .map((candidate) => candidate.uid)
+      .filter((uid): uid is string => Boolean(uid))
+  );
+  const lookupUids = [...new Set([...orphanUids, ...candidateUids])];
 
-  const { data: applications, error: applicationsError } = orphanUids.length
+  const { data: applications, error: applicationsError } = lookupUids.length
     ? await supabase
         .from("applications")
-        .select("uid, reference, description, app_type, start_date")
-        .in("uid", orphanUids)
+        .select("uid, reference, description, app_type, start_date, address")
+        .in("uid", lookupUids)
     : { data: [], error: null };
   if (applicationsError) throw applicationsError;
   const appByUid = new Map((applications ?? []).map((app) => [app.uid, app]));
@@ -266,7 +274,14 @@ export async function getProjectGroupingReviews(
     const orphan = review.uid ? appByUid.get(review.uid) : null;
     return {
       ...review,
-      candidates: (review.candidates ?? []) as GroupingReviewCandidate[],
+      candidates: ((review.candidates ?? []) as GroupingReviewCandidate[]).map(
+        (candidate) => ({
+          ...candidate,
+          address: candidate.uid
+            ? ((appByUid.get(candidate.uid)?.address as string | null) ?? null)
+            : null,
+        })
+      ),
       orphan: orphan
         ? {
             uid: orphan.uid as string,
@@ -278,6 +293,43 @@ export async function getProjectGroupingReviews(
         : null,
     };
   });
+}
+
+/**
+ * Candidate roots of an ambiguous project, derived live from memberships.
+ * Stopgap for ambiguous projects whose `multi_root` review row hasn't been
+ * written by the worker yet (see docs/2026-10-12-multi-root-split-backend-spec.md).
+ */
+export async function getAmbiguousRootCandidates(
+  project: Project
+): Promise<GroupingReviewCandidate[]> {
+  const supabase = await createClient();
+  const { data: members, error } = await supabase
+    .from("project_applications")
+    .select("uid")
+    .eq("project_id", project.id)
+    .eq("has_parent_refs", false);
+  if (error) throw error;
+  const uids = (members ?? []).map((member) => member.uid as string);
+  if (!uids.length) return [];
+
+  const { data: apps, error: appsError } = await supabase
+    .from("applications")
+    .select("uid, description, app_type, start_date, address")
+    .in("uid", uids)
+    .order("start_date", { ascending: true });
+  if (appsError) throw appsError;
+
+  return (apps ?? []).map((app) => ({
+    project_id: project.id,
+    uid: app.uid as string,
+    address: (app.address as string | null) ?? null,
+    description: (app.description as string | null) ?? null,
+    app_type: (app.app_type as string | null) ?? null,
+    start_date: (app.start_date as string | null) ?? null,
+    grouping_state: null,
+    n_applications: null,
+  }));
 }
 
 /** Page of parentless applications that currently have no scheme to join. */

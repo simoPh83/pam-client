@@ -281,3 +281,30 @@ rolled-back transaction.
 `&`/`AND` â†’ implicit AND, `NOT x` â†’ `-x`; `OR`, "quoted phrases" and
 `-negation` are native websearch syntax. English stemming applies
 (erection â†” erections). Placeholder: `e.g. house OR villa -garden`.
+
+# Session log — 2026-10-12
+
+Multi-root split groundwork (ambiguous projects).
+
+- Measured live: 940 ambiguous projects, only 208 with a pending
+  `multi_root` review — the other ~740 render "Review details are not
+  currently available". Root cause: the pam worker never writes review rows
+  incrementally (only the 2026-10-10 migration did), and split is not
+  implemented anywhere (the RPC raises on it).
+- Wrote `docs/2026-10-12-multi-root-split-backend-spec.md` for the pam
+  repo: worker-maintained review rows, a `split_requests` table, `'split'`
+  resolution in `apply_grouping_resolution` that enqueues a high-priority
+  `jobs` row (kind=`split`, priority 100, picked up within ~1 min), and a
+  worker-side `projects.split_project()` reusing the regroup DSU logic.
+- Frontend stopgap (shipped): when an ambiguous project has no review row,
+  the lead page derives candidate roots live from `project_applications`
+  (`has_parent_refs = false`) and renders the full banner instead of the
+  "not available" message. Covers 551 of the 742 gap projects; the
+  remaining 191 are zero-root components (all members have resolved parent
+  refs — cycles / missing parents), which keep the old message by design.
+- Investigated the `unlinked_no_scheme` queue (742 rows, down from 2,094):
+  ~80% clearly secondary, 134 typed Full/Outline — mostly s73/reserved-
+  matters records, plus a genuine minority of standalone mains that should
+  be standalone projects. Wrote `docs/2026-10-12-no-scheme-queue-notes.md`
+  for pam: promote original-classified no-ref apps to standalone projects +
+  extend the ref parser with `Ref:`/`RN` prefixes.
