@@ -17,6 +17,11 @@ import { projectFiltersToParams } from "@/lib/project-filters";
 import { formatDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from "@/components/ui/popover";
+import {
   Table,
   TableBody,
   TableCell,
@@ -62,6 +67,39 @@ function StateBadge({ state }: { state: string | null }) {
     >
       {state}
     </Badge>
+  );
+}
+
+/** Cap for the Description column; full text appears in a hover popover. */
+const DESCRIPTION_MAX_CHARS = 420;
+
+/** Truncated description; hovering reveals the full text in a popover. */
+function DescriptionCell({ text }: { text: string | null }) {
+  const [open, setOpen] = useState(false);
+  if (!text) return <span className="text-muted-foreground">—</span>;
+  if (text.length <= DESCRIPTION_MAX_CHARS) {
+    return <span className="block text-sm text-muted-foreground">{text}</span>;
+  }
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
+        <span
+          className="block text-sm text-muted-foreground"
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+        >
+          {text.slice(0, DESCRIPTION_MAX_CHARS).trimEnd()}…
+        </span>
+      </PopoverAnchor>
+      <PopoverContent
+        className="max-h-80 w-[32rem] overflow-y-auto text-sm"
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        {text}
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -294,12 +332,8 @@ export function ProjectsTable({
       accessorKey: "root_description",
       header: "Description",
       size: 380,
-      // Full text, wrapping — rows vary in height by design.
-      cell: ({ getValue }) => (
-        <span className="block text-sm text-muted-foreground">
-          {getValue<string>() ?? "—"}
-        </span>
-      ),
+      // Capped at DESCRIPTION_MAX_CHARS; hover shows the full text.
+      cell: ({ getValue }) => <DescriptionCell text={getValue<string>()} />,
     },
     {
       accessorKey: "filed_date",
