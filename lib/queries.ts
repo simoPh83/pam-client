@@ -88,18 +88,22 @@ export async function getProjectsFeed(
   if (error) throw error;
   const rows = (data ?? []) as Omit<
     ProjectFeedRow,
-    "address_key" | "grouping_state" | "unlinked_application_count"
+    "address_key" | "grouping_state" | "unlinked_application_count" | "has_missing_ancestors"
   >[];
   const projectIds = rows.map((row) => row.id);
   const projectById = new Map<
     number,
-    { address_key: string | null; grouping_state: GroupingState }
+    {
+      address_key: string | null;
+      grouping_state: GroupingState;
+      has_missing_ancestors: boolean;
+    }
   >();
 
   if (projectIds.length) {
     const { data: projects, error: projectsError } = await supabase
       .from("projects")
-      .select("id, address_key, grouping_state")
+      .select("id, address_key, grouping_state, has_missing_ancestors, root_in_db")
       .in("id", projectIds);
     if (projectsError) throw projectsError;
 
@@ -111,6 +115,10 @@ export async function getProjectsFeed(
       projectById.set(project.id as number, {
         address_key: (project.address_key as string | null) ?? null,
         grouping_state: state,
+        // Falls back to the legacy flag until the backend backfill has run.
+        has_missing_ancestors:
+          (project.has_missing_ancestors as boolean | null) ??
+          project.root_in_db === false,
       });
     }
 
@@ -173,10 +181,10 @@ export async function getProjectsFeed(
     }
   }
 
-  // For projects whose root isn't in the DB, annotate with the parent-hunt
+  // For projects with unresolved ancestors, annotate with the parent-hunt
   // status so the UI can explain ("being fetched" vs "not found").
   const missingIds = rows
-    .filter((r) => r.root_in_db === false)
+    .filter((r) => projectById.get(r.id)?.has_missing_ancestors)
     .map((r) => r.id);
   const statusByProject = new Map<number, string>();
   if (missingIds.length) {
@@ -203,6 +211,7 @@ export async function getProjectsFeed(
         ...r,
         address_key: project.address_key,
         grouping_state: project.grouping_state,
+        has_missing_ancestors: project.has_missing_ancestors,
         unlinked_application_count: unlinkedCounts.get(r.id) ?? 0,
         missing_parent_status: statusByProject.get(r.id) ?? null,
       };

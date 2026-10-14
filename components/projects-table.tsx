@@ -103,17 +103,17 @@ function DescriptionCell({ text }: { text: string | null }) {
   );
 }
 
-/** Three-state project icon: root missing / root only / root + children. */
+/** Three-state project icon: incomplete chain / root only / root + children. */
 function ProjectStateIcon({ row }: { row: ProjectRow }) {
-  if (row.root_in_db === false) {
+  if (row.has_missing_ancestors) {
     const hint =
       row.missing_parent_status === "exhausted"
-        ? "Original application not found on PlanIt"
+        ? "earlier application not found on PlanIt"
         : row.missing_parent_status === "found"
-          ? "Original application found — being linked"
-          : "Original application predates our records — being fetched";
+          ? "earlier application found — being linked"
+          : "earlier application predates our records — being fetched";
     return (
-      <span title={`Scheme root missing — ${hint}`}>
+      <span title={`Incomplete chain — ${hint}`}>
         <CircleAlert className="size-4 text-amber-500" />
       </span>
     );
@@ -351,8 +351,8 @@ export function ProjectsTable({
       header: "Root status",
       size: 100,
       cell: ({ row }) =>
-        row.original.root_in_db === false ? (
-          <span className="text-xs text-muted-foreground" title="Root application not in our records">
+        row.original.root_state == null ? (
+          <span className="text-xs text-muted-foreground" title="Root application state not available">
             unknown
           </span>
         ) : (
