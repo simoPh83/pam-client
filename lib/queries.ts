@@ -550,8 +550,11 @@ export type MissingParent = {
 
 /** Unresolved parent references for a project (legacy "found" rows ignored). */
 export async function getProjectMissingParents(
-  projectId: number
+  projectId: number,
+  rootInDb?: boolean | null
 ): Promise<MissingParent[]> {
+  // A root already in the DB means any leftover row is stale.
+  if (rootInDb === true) return [];
   const supabase = await createClient();
   const { data } = await supabase
     .from("missing_parents")

@@ -99,15 +99,17 @@ export function ProjectGroupingReview({
 
   return (
     <section className="space-y-3" aria-label="Scheme grouping status">
-      {project.grouping_state === "provisional" && (
-        <div className="rounded-md border border-zinc-300 bg-muted/30 px-4 py-3">
-          <Badge variant="secondary">Incomplete chain</Badge>
-          <p className="mt-1 text-sm text-muted-foreground">
-            This scheme has a provisional root because part of its parent
-            reference chain is not yet established.
-          </p>
-        </div>
-      )}
+      {project.grouping_state === "provisional" &&
+        !project.has_missing_ancestors && (
+          <div className="rounded-md border border-zinc-300 bg-muted/30 px-4 py-3">
+            <Badge variant="secondary">No root identified</Badge>
+            <p className="mt-1 text-sm text-muted-foreground">
+              This scheme has a provisional root: none of its applications
+              looks like an original, and none references an earlier
+              application.
+            </p>
+          </div>
+        )}
 
       {project.grouping_state === "ambiguous" &&
         (multiRootReviews.length ? (

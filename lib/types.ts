@@ -36,6 +36,8 @@ export type Project = {
   latest_uid: string | null;
   n_applications: number;
   grouping_state: GroupingState;
+  root_in_db?: boolean | null;
+  has_missing_ancestors?: boolean | null;
   first_seen: string | null;
   last_updated: string | null;
 };

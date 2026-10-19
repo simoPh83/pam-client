@@ -277,11 +277,16 @@ export function ProjectsTable({
               Multiple schemes
             </Badge>
           )}
-          {row.original.grouping_state === "provisional" && (
-            <Badge variant="secondary" className="shrink-0">
-              Incomplete chain
-            </Badge>
-          )}
+          {row.original.grouping_state === "provisional" &&
+            !row.original.has_missing_ancestors && (
+              <Badge
+                variant="secondary"
+                className="shrink-0"
+                title="No application references an earlier one, so no root could be identified"
+              >
+                No root identified
+              </Badge>
+            )}
           {row.original.unlinked_application_count > 0 && (
             <Badge
               variant="outline"

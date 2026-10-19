@@ -57,7 +57,7 @@ export default async function LeadDetailPage({
           getProjectPractices(projectId),
           getProjectAgents(projectId),
           getProjectGroupingReviews(project),
-          getProjectMissingParents(projectId),
+          getProjectMissingParents(projectId, project.root_in_db),
         ])
       : [[], [], [], []];
 
