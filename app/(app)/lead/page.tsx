@@ -5,6 +5,7 @@ import {
   getProjectAgents,
   getProjectBundle,
   getProjectGroupingReviews,
+  getProjectMissingParents,
   getProjectPractices,
   getSplitRequest,
 } from "@/lib/queries";
@@ -50,14 +51,15 @@ export default async function LeadDetailPage({
   // Project-level data (persistent across application tabs): shared practice
   // assignments and the read-only aggregation of PlanIt agents.
   const projectId = app.project_id != null ? Number(app.project_id) : null;
-  const [assignments, agents, groupingReviews] =
+  const [assignments, agents, groupingReviews, missingParents] =
     projectId != null && project
       ? await Promise.all([
           getProjectPractices(projectId),
           getProjectAgents(projectId),
           getProjectGroupingReviews(project),
+          getProjectMissingParents(projectId),
         ])
-      : [[], [], []];
+      : [[], [], [], []];
 
   // In-flight worker split, if the user requested one for this project.
   const splitRequest =
@@ -87,6 +89,36 @@ export default async function LeadDetailPage({
         currentUid={uid}
         projectName={project?.name ?? null}
       />
+      {missingParents.length > 0 && (
+        <div className="space-y-2">
+          {missingParents.map((mp) => {
+            const exhausted = mp.status === "exhausted";
+            return (
+              <div
+                key={`${mp.authority}/${mp.reference}`}
+                className={
+                  exhausted
+                    ? "rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-900"
+                    : "rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+                }
+              >
+                <span className="font-medium">
+                  {exhausted
+                    ? "Root application missing"
+                    : "Root application being fetched"}
+                </span>
+                {" — "}
+                {exhausted
+                  ? "the worker searched for "
+                  : "an earlier application predates our records: "}
+                <span className="font-mono">{mp.reference}</span>
+                {exhausted ? " and could not find it." : "."}
+                {mp.attempts ? ` (${mp.attempts} attempts)` : ""}
+              </div>
+            );
+          })}
+        </div>
+      )}
       {project && (
         <ProjectGroupingReview
           project={project}

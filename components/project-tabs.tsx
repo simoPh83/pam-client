@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useNavigate } from "@/components/navigation-overlay";
 import type { ProjectMembership } from "@/lib/types";
 import { formatMonthYear } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -41,7 +41,7 @@ export function ProjectTabs({
   currentUid: string;
   projectName: string | null;
 }) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   if (members.length <= 1) return null;
 
@@ -63,7 +63,7 @@ export function ProjectTabs({
               role="tab"
               aria-selected={isCurrent}
               title={`${m.reference ?? m.uid} — ${roleLabel(m)}${m.app_state ? ` — ${m.app_state}` : ""} — linked by ${LINKED_BY_LABEL[m.linked_by]}`}
-              onClick={() => router.push(`/lead?uid=${encodeURIComponent(m.uid)}`)}
+              onClick={() => navigate(`/lead?uid=${encodeURIComponent(m.uid)}`)}
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-mono text-xs transition-colors",
                 isCurrent

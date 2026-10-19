@@ -193,11 +193,11 @@ export async function getProjectsFeed(
       .select("project_id, status")
       .in("project_id", missingIds);
     for (const r of mp ?? []) {
-      // worst-status wins: exhausted > pending > found
-      const prev = statusByProject.get(r.project_id as number);
+      // status is pending | exhausted; exhausted wins. Legacy "found" rows are ignored.
       const cur = r.status as string;
-      if (!prev || cur === "exhausted" || (cur === "pending" && prev === "found"))
-        statusByProject.set(r.project_id as number, cur);
+      if (cur !== "pending" && cur !== "exhausted") continue;
+      const prev = statusByProject.get(r.project_id as number);
+      if (!prev || cur === "exhausted") statusByProject.set(r.project_id as number, cur);
     }
   }
 
@@ -538,6 +538,27 @@ export async function getProjectBundle(projectId: number | string): Promise<{
   });
 
   return { project: project as Project, members: joined };
+}
+
+export type MissingParent = {
+  authority: string;
+  reference: string;
+  requested_by: string | null;
+  status: "pending" | "exhausted";
+  attempts: number | null;
+};
+
+/** Unresolved parent references for a project (legacy "found" rows ignored). */
+export async function getProjectMissingParents(
+  projectId: number
+): Promise<MissingParent[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("missing_parents")
+    .select("authority, reference, requested_by, status, attempts")
+    .eq("project_id", projectId)
+    .in("status", ["pending", "exhausted"]);
+  return (data ?? []) as MissingParent[];
 }
 
 /** Shared practice assignments for a project, with practice + contacts. */

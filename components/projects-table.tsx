@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "@/components/navigation-overlay";
 import { useState, useTransition } from "react";
 import {
   flexRender,
@@ -106,14 +106,15 @@ function DescriptionCell({ text }: { text: string | null }) {
 /** Three-state project icon: incomplete chain / root only / root + children. */
 function ProjectStateIcon({ row }: { row: ProjectRow }) {
   if (row.has_missing_ancestors) {
-    const hint =
-      row.missing_parent_status === "exhausted"
-        ? "earlier application not found on PlanIt"
-        : row.missing_parent_status === "found"
-          ? "earlier application found — being linked"
-          : "earlier application predates our records — being fetched";
+    if (row.missing_parent_status === "exhausted") {
+      return (
+        <span title="Root application missing — the worker searched and could not find it">
+          <CircleAlert className="size-4 text-red-600" />
+        </span>
+      );
+    }
     return (
-      <span title={`Incomplete chain — ${hint}`}>
+      <span title="Incomplete chain — earlier application predates our records, being fetched">
         <CircleAlert className="size-4 text-amber-500" />
       </span>
     );
@@ -203,14 +204,14 @@ function SortableHead({
   col: ProjectFilters["sort"];
   filters: ProjectFilters;
 }) {
-  const router = useRouter();
+  const navigate = useNavigate();
   const active = filters.sort === col;
   const nextDir = active && filters.dir === "desc" ? "asc" : "desc";
   return (
     <button
       className="flex items-center gap-1 font-medium"
       onClick={() =>
-        router.push(
+        navigate(
           `/?${projectFiltersToParams({ ...filters, sort: col, dir: nextDir, page: 1 })}`
         )
       }
@@ -233,7 +234,7 @@ export function ProjectsTable({
   rows: ProjectRow[];
   filters: ProjectFilters;
 }) {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   const columns: ColumnDef<ProjectRow>[] = [
     {
@@ -432,7 +433,7 @@ export function ProjectsTable({
                 )}
                 onClick={() => {
                   if (row.original.root_uid)
-                    router.push(
+                    navigate(
                       `/lead?uid=${encodeURIComponent(row.original.root_uid)}`
                     );
                 }}
