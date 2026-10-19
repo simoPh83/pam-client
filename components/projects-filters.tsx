@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { Loader2 } from "lucide-react";
 import type { ProjectFilters, RootStatusGroup } from "@/lib/project-filters";
 import { defaultProjectFilters, projectFiltersToParams } from "@/lib/project-filters";
 import type { PracticeStatus } from "@/lib/types";
@@ -44,6 +45,7 @@ export function ProjectsFilters({
   boroughs: string[];
 }) {
   const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const [q, setQ] = useState(filters.q ?? "");
   const [desc, setDesc] = useState(filters.desc ?? "");
   const [filedFrom, setFiledFrom] = useState(filters.filedFrom ?? "");
@@ -73,7 +75,9 @@ export function ProjectsFilters({
       page: 1,
       ...overrides,
     };
-    router.push(`/?${projectFiltersToParams(next).toString()}`);
+    startTransition(() => {
+      router.push(`/?${projectFiltersToParams(next).toString()}`);
+    });
   }
 
   function reset() {
@@ -88,7 +92,9 @@ export function ProjectsFilters({
     setStatusSel([]);
     setPracticeSel("any");
     setStarred(false);
-    router.push("/");
+    startTransition(() => {
+      router.push("/");
+    });
   }
 
   function toggle<T>(list: T[], v: T, set: (x: T[]) => void) {
@@ -248,8 +254,9 @@ export function ProjectsFilters({
       </div>
 
       <div className="ml-auto flex gap-2">
-        <Button type="submit" size="sm" className="h-8">
-          Apply
+        <Button type="submit" size="sm" className="h-8" disabled={pending}>
+          {pending && <Loader2 className="animate-spin" />}
+          {pending ? "Applying…" : "Apply"}
         </Button>
         <Button
           type="button"
@@ -262,6 +269,13 @@ export function ProjectsFilters({
         </Button>
       </div>
       </div>
+      {pending && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed inset-0 z-50 cursor-wait bg-background/40"
+        />
+      )}
     </form>
   );
 }
