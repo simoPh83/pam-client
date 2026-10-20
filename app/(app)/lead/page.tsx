@@ -122,6 +122,7 @@ export default async function LeadDetailPage({
       {project && (
         <ProjectGroupingReview
           project={project}
+          members={members}
           reviews={groupingReviews}
           splitRequest={splitRequest}
         />

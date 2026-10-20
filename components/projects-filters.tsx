@@ -48,6 +48,13 @@ export function ProjectsFilters({
   const [pending, startTransition] = useTransition();
   const [q, setQ] = useState(filters.q ?? "");
   const [desc, setDesc] = useState(filters.desc ?? "");
+  const [appsMin, setAppsMin] = useState(
+    filters.appsMin != null ? String(filters.appsMin) : ""
+  );
+  const [appsMax, setAppsMax] = useState(
+    filters.appsMax != null ? String(filters.appsMax) : ""
+  );
+  const [appsError, setAppsError] = useState<string | null>(null);
   const [filedFrom, setFiledFrom] = useState(filters.filedFrom ?? "");
   const [filedTo, setFiledTo] = useState(filters.filedTo ?? "");
   const [updatedFrom, setUpdatedFrom] = useState(filters.updatedFrom ?? "");
@@ -60,10 +67,21 @@ export function ProjectsFilters({
   const [starred, setStarred] = useState(filters.starred);
 
   function apply(overrides: Partial<ProjectFilters> = {}) {
+    let min = parseInt(appsMin, 10);
+    let max = parseInt(appsMax, 10);
+    if (!Number.isSafeInteger(min) || min < 1) min = NaN;
+    if (!Number.isSafeInteger(max) || max < 1) max = NaN;
+    if (!Number.isNaN(min) && !Number.isNaN(max) && min > max) {
+      setAppsError("Min can't be greater than max.");
+      return;
+    }
+    setAppsError(null);
     const next: ProjectFilters = {
       ...filters,
       q: q || null,
       desc: desc || null,
+      appsMin: Number.isNaN(min) ? null : min,
+      appsMax: Number.isNaN(max) ? null : max,
       filedFrom: filedFrom || null,
       filedTo: filedTo || null,
       updatedFrom: updatedFrom || null,
@@ -84,6 +102,9 @@ export function ProjectsFilters({
     const d = defaultProjectFilters();
     setQ("");
     setDesc("");
+    setAppsMin("");
+    setAppsMax("");
+    setAppsError(null);
     setFiledFrom("");
     setFiledTo("");
     setUpdatedFrom(d.updatedFrom ?? "");
@@ -109,8 +130,8 @@ export function ProjectsFilters({
         apply();
       }}
     >
-      {/* Row 1: free-text searches */}
-      <div className="grid gap-3 sm:grid-cols-2">
+      {/* Row 1: free-text searches + application-count range */}
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr]">
         <div className="space-y-1">
           <Label className="text-xs">Project name</Label>
           <Input
@@ -119,6 +140,41 @@ export function ProjectsFilters({
             placeholder="name / address"
             className="h-8"
           />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Applications</Label>
+          <div className="flex items-center gap-1.5">
+            <Input
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={appsMin}
+              onChange={(e) => {
+                setAppsMin(e.target.value);
+                setAppsError(null);
+              }}
+              placeholder="min"
+              aria-invalid={appsError != null}
+              className="h-8 w-20"
+            />
+            <span className="text-xs text-muted-foreground">–</span>
+            <Input
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={appsMax}
+              onChange={(e) => {
+                setAppsMax(e.target.value);
+                setAppsError(null);
+              }}
+              placeholder="max"
+              aria-invalid={appsError != null}
+              className="h-8 w-20"
+            />
+          </div>
+          {appsError && (
+            <p className="text-xs text-destructive">{appsError}</p>
+          )}
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Description</Label>

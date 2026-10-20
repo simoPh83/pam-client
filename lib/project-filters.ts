@@ -17,6 +17,8 @@ export type ProjectFilters = {
   practice: PracticeStatus | null; // projects_feed.practice_status
   q: string | null; // project name search
   desc: string | null; // root description search (trigram, min 3 chars)
+  appsMin: number | null; // projects_feed.n_applications >= min
+  appsMax: number | null; // projects_feed.n_applications <= max
   starred: boolean;
   sort: "last_updated" | "filed_date" | "name";
   dir: "asc" | "desc";
@@ -41,6 +43,8 @@ export function defaultProjectFilters(): ProjectFilters {
     practice: null,
     q: null,
     desc: null,
+    appsMin: null,
+    appsMax: null,
     starred: false,
     sort: "last_updated",
     dir: "desc",
@@ -70,6 +74,14 @@ export function parseProjectFilters(
   const sort = str("sort");
   const dir = str("dir");
   const updatedFrom = str("updatedFrom");
+  const posInt = (k: string): number | null => {
+    const n = parseInt(str(k) ?? "", 10);
+    return Number.isSafeInteger(n) && n >= 1 ? n : null;
+  };
+  // No min<=max normalisation here: the bar surfaces swapped values and the
+  // Apply handler rejects them, so the user sees their own mistake.
+  const appsMin = posInt("appsMin");
+  const appsMax = posInt("appsMax");
   return {
     boroughs: str("borough")?.split(",").filter(Boolean) ?? [],
     filedFrom: str("filedFrom"),
@@ -85,6 +97,8 @@ export function parseProjectFilters(
       : null,
     q: str("q"),
     desc: str("desc"),
+    appsMin,
+    appsMax,
     starred: str("starred") === "1",
     sort:
       sort === "filed_date" || sort === "name" ? sort : "last_updated",
@@ -107,6 +121,8 @@ export function projectFiltersToParams(f: ProjectFilters): URLSearchParams {
   if (f.practice) p.set("practice", f.practice);
   if (f.q) p.set("q", f.q);
   if (f.desc) p.set("desc", f.desc);
+  if (f.appsMin != null) p.set("appsMin", String(f.appsMin));
+  if (f.appsMax != null) p.set("appsMax", String(f.appsMax));
   if (f.starred) p.set("starred", "1");
   if (f.sort !== d.sort) p.set("sort", f.sort);
   if (f.dir !== d.dir) p.set("dir", f.dir);

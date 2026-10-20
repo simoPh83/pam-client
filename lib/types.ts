@@ -215,6 +215,7 @@ export type ProjectFeedRow = {
   root_in_db: boolean | null;
   /** Any member cites a parent ref not yet in the DB (projects.has_missing_ancestors). */
   has_missing_ancestors: boolean;
+  all_members_have_parent_refs: boolean;
   first_seen: string | null;
   last_updated: string | null;
   root_uid: string | null;

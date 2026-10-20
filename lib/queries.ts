@@ -64,6 +64,8 @@ export async function getProjectsFeed(
     const like = `%${f.q.replace(/[%,()]/g, " ")}%`;
     query = query.ilike("name", like);
   }
+  if (f.appsMin != null) query = query.gte("n_applications", f.appsMin);
+  if (f.appsMax != null) query = query.lte("n_applications", f.appsMax);
   if (f.desc?.trim()) {
     // Full-text search over the precomputed root-description tsvector
     // (migration 007 — trigram ILIKE was unusable for common terms).
@@ -88,7 +90,11 @@ export async function getProjectsFeed(
   if (error) throw error;
   const rows = (data ?? []) as Omit<
     ProjectFeedRow,
-    "address_key" | "grouping_state" | "unlinked_application_count" | "has_missing_ancestors"
+    | "address_key"
+    | "grouping_state"
+    | "unlinked_application_count"
+    | "has_missing_ancestors"
+    | "all_members_have_parent_refs"
   >[];
   const projectIds = rows.map((row) => row.id);
   const projectById = new Map<
@@ -125,6 +131,24 @@ export async function getProjectsFeed(
     const missingProject = projectIds.find((id) => !projectById.has(id));
     if (missingProject != null) {
       throw new Error(`Grouping metadata is missing for project ${missingProject}`);
+    }
+  }
+
+  const membersWithRefs = new Map<number, boolean>();
+  if (projectIds.length) {
+    const { data: memberships, error: membershipsError } = await supabase
+      .from("project_applications")
+      .select("project_id, parent_ref")
+      .in("project_id", projectIds);
+    if (membershipsError) throw membershipsError;
+
+    for (const membership of memberships ?? []) {
+      const projectId = membership.project_id as number;
+      const hasParentRef = membership.parent_ref != null;
+      membersWithRefs.set(
+        projectId,
+        (membersWithRefs.get(projectId) ?? true) && hasParentRef
+      );
     }
   }
 
@@ -212,6 +236,7 @@ export async function getProjectsFeed(
         address_key: project.address_key,
         grouping_state: project.grouping_state,
         has_missing_ancestors: project.has_missing_ancestors,
+        all_members_have_parent_refs: membersWithRefs.get(r.id) ?? false,
         unlinked_application_count: unlinkedCounts.get(r.id) ?? 0,
         missing_parent_status: statusByProject.get(r.id) ?? null,
       };

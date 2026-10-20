@@ -282,9 +282,15 @@ export function ProjectsTable({
               <Badge
                 variant="secondary"
                 className="shrink-0"
-                title="No application references an earlier one, so no root could be identified"
+                title={
+                  row.original.all_members_have_parent_refs
+                    ? "Applications reference other applications; the earliest is shown as the provisional root"
+                    : "No application references an earlier one, so no root could be identified"
+                }
               >
-                No root identified
+                {row.original.all_members_have_parent_refs
+                  ? "Cross-referenced applications"
+                  : "No root identified"}
               </Badge>
             )}
           {row.original.unlinked_application_count > 0 && (

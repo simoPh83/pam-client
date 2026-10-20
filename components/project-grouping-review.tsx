@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { GroupingReviewCandidate, Project, ProjectGroupingReview, SplitRequest } from "@/lib/types";
+import type {
+  GroupingReviewCandidate,
+  Project,
+  ProjectGroupingReview,
+  ProjectMembership,
+  SplitRequest,
+} from "@/lib/types";
 import { formatDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/badge";
 import { GroupingResolutionButton } from "@/components/grouping-resolution-button";
@@ -59,10 +65,12 @@ function CandidateDetails({
 
 export function ProjectGroupingReview({
   project,
+  members,
   reviews,
   splitRequest,
 }: {
   project: Project;
+  members: Pick<ProjectMembership, "parent_ref">[];
   reviews: ProjectGroupingReview[];
   splitRequest?: SplitRequest | null;
 }) {
@@ -74,6 +82,8 @@ export function ProjectGroupingReview({
   const unlinkedReviews = reviews.filter(
     (review) => review.reason === "unlinked_multi_scheme"
   );
+  const allMembersHaveParentRefs =
+    members.length > 0 && members.every((member) => member.parent_ref != null);
 
   const splitInFlight =
     splitQueued ||
@@ -102,12 +112,25 @@ export function ProjectGroupingReview({
       {project.grouping_state === "provisional" &&
         !project.has_missing_ancestors && (
           <div className="rounded-md border border-zinc-300 bg-muted/30 px-4 py-3">
-            <Badge variant="secondary">No root identified</Badge>
-            <p className="mt-1 text-sm text-muted-foreground">
-              This scheme has a provisional root: none of its applications
-              looks like an original, and none references an earlier
-              application.
-            </p>
+            {allMembersHaveParentRefs ? (
+              <>
+                <Badge variant="secondary">Cross-referenced applications</Badge>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  These applications reference other applications (for
+                  example, parallel consents for the same works); the earliest
+                  is shown as the provisional root.
+                </p>
+              </>
+            ) : (
+              <>
+                <Badge variant="secondary">No root identified</Badge>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  This scheme has a provisional root: none of its applications
+                  looks like an original, and none references an earlier
+                  application.
+                </p>
+              </>
+            )}
           </div>
         )}
 
